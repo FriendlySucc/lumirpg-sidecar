@@ -1,25 +1,29 @@
-# LumiRPG Sidecar — prototype source
+# LumiRPG Sidecar
 
-This is a source prototype for a Lumiverse 1.3.0 Spindle extension. It has not been built or installed in this workspace because no Bun/TypeScript runner is exposed here. Treat it as unverified until the host builds it and the user tests it in a disposable chat.
+A background map and Ledger companion for Lumiverse roleplay chats.
 
-## Design
+## What it does
 
-- Background-only Terra analysis after successful, non-background roleplay replies.
-- Per-chat opt-in; disabled by default.
-- Separate saved connection selected in the drawer; it never switches the roleplay model.
-- Private per-user storage; no tracker messages, prompt injection, preset edits, or transcript edits.
-- Existing `<state:locations>` Atlas data is imported as a baseline for Local / Region / World maps. Rendered rooms are usable; `loc_load` details remain hidden.
-- The standalone Ledger lifecycle is imported only from an explicit `<details class="ldg-source">` block. Dormant/unknown Ledger status is never turned into stats or skills.
-- Terra responses are JSON-only, bounded, validated, evidence-checked, and rejected without replacing the previous snapshot when invalid.
-- Branches, edits, deletes, swipes, restarts, and out-of-order results mark the snapshot stale instead of silently merging incompatible state. Rebuild is explicit.
-- The drawer contains an SVG map with proportional tiles and clipped connection lines, plus Ledger sections for stats, skills, equipment, quests, flags, and recent changes.
+- Runs private Terra analysis after successful, non-background roleplay replies.
+- Stays disabled until enabled for a chat.
+- Uses a separate saved connection and never changes the roleplay model.
+- Keeps one private snapshot per user and chat.
+- Imports existing Local, Region, and World Atlas data as a baseline.
+- Imports the Ledger only from an explicit revealed Ledger block. Dormant or unknown Ledger data stays empty.
+- Validates and evidence-checks proposed map and Ledger changes before saving them.
+- Marks the snapshot stale after branches, edits, deletes, swipes, restarts, or out-of-order results instead of merging incompatible state.
+- Shows the map and Ledger in a drawer tab without adding messages or changing the roleplay transcript.
 
-## Installation
+## Install
 
-This repository needs to live in a trusted GitHub repository or the server's local extension directory before Spindle can install it. Replace the placeholder `github` and `homepage` fields in `spindle.json` before publishing. The empty `dist/` directory was intentionally removed so Lumiverse can auto-build `src/backend.ts` and `src/frontend.ts` on install, as documented by Lumiverse.
+Place these files at the root of a trusted GitHub repository or in the server's local extension directory. Keep `spindle.json` at the repository root and keep the `src` folder beside it. Lumiverse builds the two source modules when the extension is installed; compiled output is not included.
 
-After installation, grant `generation`, `chat_mutation`, and `chats`. `chat_mutation` is read-only here: it is required by Lumiverse for bounded message reads, but this prototype never edits messages. Open the drawer tab, choose a saved Terra connection, enable background updates for the current chat, and use **Analyze now**. Extra provider usage can occur whenever a successful assistant reply is analyzed.
+After installation, grant `generation`, `chat_mutation`, and `chats`. Open the LumiRPG Sidecar drawer, choose a saved Terra connection, enable background updates for the current chat, and use **Analyze now** for an immediate update.
 
-## Current limitation
+The extension can make an extra provider request after a successful assistant reply. It never edits messages, changes presets, injects its state into the roleplay prompt, or switches the main roleplay connection.
 
-The source includes synthetic Bun tests in `tests/sidecar.test.ts`, but no build, type-check, or test has been run in this workspace because no Bun runner is exposed here. Run `bun install`, `bun test tests/sidecar.test.ts`, and `bun run build` in the host or a trusted clone before installation. This archive remains a source prototype, not a finished extension release.
+## Failure messages
+
+Analysis errors show a fixed stage and reason code without exposing story text, model output, provider errors, credentials, or connection identifiers. Save failures distinguish changes that were not submitted, have an uncertain result, or were confirmed.
+
+Version: 0.1.4
