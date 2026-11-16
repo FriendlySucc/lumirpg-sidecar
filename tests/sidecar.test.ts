@@ -250,6 +250,22 @@ test('an analyzed fresh envelope roundtrips with matching synthetic proof', asyn
   expect(() => api.readSavedEnvelope({ ...saved, proof: wrongLastId }, chatId)).toThrow()
 })
 
+test('echoed imported Atlas tiles are ignored before new-tile validation', async () => {
+  const api = await testing
+  const input = [message('echo_atlas', atlasBody)]
+  const source = await api.sources(input)
+  const proposal = {
+    maps: {
+      local: {
+        tiles: [{ id: 'model_echo', name: 'Bramble Gallery · 80 m', kind: 'room', status: 'known', x: -12, y: -7, w: 16, h: 10, sizeLabel: '80 m', summary: 'A tiled floor', connections: [], hidden: false, evidence: 'Bramble Gallery · 80 m' }],
+      },
+    },
+  }
+  const merged = await api.mergeProposal(api.emptyEnvelope('synthetic_echo'), proposal, source, await syntheticSnapshot(input), false)
+  expect(merged.state.maps.local.tiles).toHaveLength(1)
+  expect(merged.state.maps.local.tiles[0].name).toBe('Bramble Gallery')
+})
+
 test('a map proposal without an id updates an existing baseline without losing its Atlas tile', async () => {
   const api = await testing
   const atlasSource = await api.sources([message('baseline_atlas', atlasBody)])

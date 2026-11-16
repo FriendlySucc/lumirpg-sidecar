@@ -718,6 +718,16 @@ async function mergeProposal(record: Envelope, parsed: unknown, source: Sources,
         notices.push('A map suggestion for a different map was ignored.')
         continue
       }
+      if (importedScales.has(scale) && Array.isArray(proposed.tiles)) {
+        const imported = next.state.maps[scale].tiles
+        const importedIds = new Set(imported.map((tile) => tile.id))
+        const importedNames = new Set(imported.flatMap((tile) => [tile.name, visibleMapName(tile.name)].map((name) => name.trim().toLocaleLowerCase())))
+        proposed.tiles = proposed.tiles.filter((raw) => {
+          const tile = object(raw)
+          const name = typeof tile.name === 'string' ? visibleMapName(tile.name).trim().toLocaleLowerCase() : ''
+          return !(typeof tile.id === 'string' && importedIds.has(tile.id)) && !importedNames.has(name)
+        })
+      }
       next.state.maps[scale] = await mergeMap(scale, proposed, next, source, notices)
     }
   }
