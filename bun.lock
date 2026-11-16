@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "lumi-rpg-sidecar",
+      "devDependencies": {
+        "lumiverse-spindle-types": "latest",
+      },
+    },
+  },
+  "packages": {
+    "lumiverse-spindle-types": ["lumiverse-spindle-types@0.6.80", "", {}, "sha512-YaAiNKzYnFFo199jkXwIu0bJYcTBZZ2RAYjIFmXbbcpPIVOiPwS4y5vb+Zf2NCjwMc13zHYybOgnmVPe3P98nw=="],
+  }
+}
