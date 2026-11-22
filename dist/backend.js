@@ -754,6 +754,7 @@ async function runAnalysis(rt, mode, trigger, origin) {
     const rawResult = await spindle.generate.raw({
       type: "raw",
       connection_id: chosen.id,
+      userId: rt.userId,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt }
