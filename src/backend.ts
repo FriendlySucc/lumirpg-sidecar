@@ -21,9 +21,10 @@ import type {
 declare const spindle: import('lumiverse-spindle-types').SpindleAPI
 
 const STORAGE_ROOT = 'lumi-atlas-v1'
-const MAX_ARCHIVES = 5
-const ANALYSIS_TIMEOUT_MS = 120_000
+const MAX_ARCHIVES = 20
+const ANALYSIS_TIMEOUT_MS = 180_000
 const MESSAGE_TAIL = 14
+const STREAM_THROTTLE_MS = 140
 
 interface Origin {
   sessionId?: string
@@ -90,16 +91,20 @@ function defaultChatRecord(chatId: string): StoredChatRecord {
   }
 }
 
+function normalizeReasoningMode(raw: unknown): 'inherit' | 'off' {
+  return raw === 'off' ? 'off' : 'inherit'
+}
+
 async function readUserConfig(userId: string): Promise<UserConfig> {
   try {
     const raw = await spindle.userStorage.getJson<Partial<UserConfig>>(userConfigPath(), {
       userId,
-      fallback: { connectionId: null },
+      fallback: { connectionId: null, reasoningMode: 'inherit' },
     })
     const connectionId = typeof raw?.connectionId === 'string' && raw.connectionId.trim() ? raw.connectionId.trim() : null
-    return { connectionId }
+    return { connectionId, reasoningMode: normalizeReasoningMode(raw?.reasoningMode) }
   } catch {
-    return { connectionId: null }
+    return { connectionId: null, reasoningMode: 'inherit' }
   }
 }
 
@@ -192,8 +197,32 @@ function emitStatus(
   state?: AtlasState | null,
   config?: EffectiveConfig,
   origin?: Origin,
+  archives?: Record<Scale, MapLayer[]>,
 ): void {
-  sendToUI(userId, { type: 'status', chatId, status, message, state, config }, origin)
+  sendToUI(userId, { type: 'status', chatId, status, message, state, archives, config }, origin)
+}
+
+function emitStream(
+  userId: string,
+  chatId: string,
+  phase: 'thinking' | 'writing',
+  reasoning: string,
+  outputChars: number,
+  outputTail: string,
+  origin?: Origin,
+): void {
+  sendToUI(
+    userId,
+    {
+      type: 'stream',
+      chatId,
+      phase,
+      reasoning: reasoning.slice(-8000),
+      outputChars,
+      outputTail: outputTail.slice(-320),
+    },
+    origin,
+  )
 }
 
 function cancelRuntime(rt: ChatRuntime, notifyMessage?: string, origin?: Origin): void {
@@ -321,12 +350,17 @@ async function runAnalysis(
     const userConfig = await readUserConfig(rt.userId)
     const record = await loadChatRecord(rt)
     fallbackState = record.state
+    const effectiveConfig: EffectiveConfig = {
+      ...record.config,
+      connectionId: userConfig.connectionId,
+      reasoningMode: userConfig.reasoningMode ?? 'inherit',
+    }
 
     if (trigger === 'auto' && (!record.config.enabled || !record.config.autoUpdate)) return
 
     if (!userConfig.connectionId) {
       if (trigger === 'manual') {
-        emitStatus(rt.userId, rt.chatId, 'error', 'Pick a background connection (e.g. Terra) in Settings first.', record.state, { ...record.config, connectionId: null }, origin)
+        emitStatus(rt.userId, rt.chatId, 'error', 'Pick a background connection (e.g. Terra) in Settings first.', record.state, effectiveConfig, origin, record.archives)
       }
       return
     }
@@ -335,7 +369,7 @@ async function runAnalysis(
     const chosen = connections.find((c) => c.id === userConfig.connectionId)
     if (!chosen) {
       if (trigger === 'manual') {
-        emitStatus(rt.userId, rt.chatId, 'error', 'Selected connection is no longer available. Pick another in Settings.', record.state, { ...record.config, connectionId: userConfig.connectionId }, origin)
+        emitStatus(rt.userId, rt.chatId, 'error', 'Selected connection is no longer available. Pick another in Settings.', record.state, effectiveConfig, origin, record.archives)
       }
       return
     }
@@ -343,7 +377,7 @@ async function runAnalysis(
     const { messages, latestMessageId, totalRead } = await readRecentMessages(rt.chatId)
     if (!messages.length) {
       if (trigger === 'manual') {
-        emitStatus(rt.userId, rt.chatId, 'error', 'No visible chat messages to map yet.', record.state, undefined, origin)
+        emitStatus(rt.userId, rt.chatId, 'error', 'No visible chat messages to map yet.', record.state, effectiveConfig, origin, record.archives)
       }
       return
     }
@@ -371,32 +405,71 @@ async function runAnalysis(
         ? `Rebuilding 3-layer Atlas with ${chosen.name}…`
         : `Charting map update with ${chosen.name}…`,
       record.state,
-      { ...record.config, connectionId: userConfig.connectionId },
+      effectiveConfig,
       origin,
+      record.archives,
     )
 
     const userPrompt = buildAtlasPrompt(messages, mode === 'rebuild' ? null : record.state, mode)
     const effectiveModel = chosen.model.trim()
     const genParams: Record<string, unknown> = { temperature: 0.2, max_tokens: 4800 }
     if (effectiveModel) genParams.model = effectiveModel
-    const rawResult = await spindle.generate.raw({
-      type: 'raw',
+    const genRequest = {
+      type: 'raw' as const,
       connection_id: chosen.id,
       ...(chosen.provider ? { provider: chosen.provider } : {}),
       ...(effectiveModel ? { model: effectiveModel } : {}),
       userId: rt.userId,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
+        { role: 'system' as const, content: SYSTEM_PROMPT },
+        { role: 'user' as const, content: userPrompt },
       ],
       parameters: genParams,
-      reasoning: { source: 'off' },
+      reasoning: effectiveConfig.reasoningMode === 'off' ? { source: 'off' as const } : { source: 'inherit' as const },
       signal: controller.signal,
-    } as Parameters<typeof spindle.generate.raw>[0])
+    } as Parameters<typeof spindle.generate.raw>[0]
+
+    let content = ''
+    if (typeof spindle.generate.rawStream === 'function') {
+      let reasoningAcc = ''
+      let contentAcc = ''
+      let lastEmit = 0
+      emitStream(rt.userId, rt.chatId, 'thinking', '', 0, '', origin)
+      for await (const chunk of spindle.generate.rawStream(genRequest)) {
+        if (controller.signal.aborted || myEpoch !== rt.epoch) return
+        if (chunk.type === 'reasoning') {
+          reasoningAcc += chunk.token
+        } else if (chunk.type === 'token') {
+          contentAcc += chunk.token
+        } else if (chunk.type === 'done') {
+          content = chunk.content || contentAcc
+          if (chunk.reasoning && !reasoningAcc) reasoningAcc = chunk.reasoning
+          emitStream(rt.userId, rt.chatId, 'writing', reasoningAcc, content.length, content, origin)
+          break
+        }
+        const now = Date.now()
+        if (now - lastEmit >= STREAM_THROTTLE_MS) {
+          lastEmit = now
+          emitStream(
+            rt.userId,
+            rt.chatId,
+            contentAcc.length > 0 ? 'writing' : 'thinking',
+            reasoningAcc,
+            contentAcc.length,
+            contentAcc,
+            origin,
+          )
+        }
+      }
+      if (!content && contentAcc) content = contentAcc
+    } else {
+      const rawResult = await spindle.generate.raw(genRequest)
+      if (controller.signal.aborted || myEpoch !== rt.epoch) return
+      content = extractResponseContent(rawResult)
+    }
 
     if (controller.signal.aborted || myEpoch !== rt.epoch) return
 
-    const content = extractResponseContent(rawResult)
     if (!content.trim()) {
       throw new Error(`${chosen.name} returned an empty response.`)
     }
@@ -428,8 +501,9 @@ async function runAnalysis(
       'ready',
       `Atlas updated (${counts}).`,
       nextState,
-      { ...nextRecord.config, connectionId: userConfig.connectionId },
+      effectiveConfig,
       origin,
+      nextRecord.archives,
     )
   } catch (err) {
     if (controller && myEpoch !== rt.epoch) return
@@ -584,9 +658,15 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
             type: 'init',
             requestId: msg.requestId ?? null,
             activeChatId: null,
-            config: { enabled: false, autoUpdate: true, connectionId: userConfig.connectionId },
+            config: {
+              enabled: false,
+              autoUpdate: true,
+              connectionId: userConfig.connectionId,
+              reasoningMode: userConfig.reasoningMode ?? 'inherit',
+            },
             connections,
             state: null,
+            archives: { local: [], region: [], world: [] },
             busy: false,
             statusMessage: 'Open a chat to view its Atlas.',
             error: null,
@@ -601,6 +681,7 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
       const effective: EffectiveConfig = {
         ...record.config,
         connectionId: userConfig.connectionId,
+        reasoningMode: userConfig.reasoningMode ?? 'inherit',
       }
       const statusMessage = rt.busy
         ? 'Charting map update…'
@@ -619,6 +700,7 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
           config: effective,
           connections,
           state: record.state,
+          archives: record.archives,
           busy: rt.busy,
           statusMessage,
           error: null,
@@ -637,7 +719,9 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
           return
         }
       }
-      await writeUserConfig(userId, { connectionId })
+      const prevUserConfig = await readUserConfig(userId)
+      const reasoningMode = prevUserConfig.reasoningMode ?? 'inherit'
+      await writeUserConfig(userId, { connectionId, reasoningMode })
       const activeChatId = await getActiveChatId(userId)
       const rt = activeChatId ? getRuntime(userId, activeChatId) : null
       const record = rt ? await loadChatRecord(rt) : null
@@ -651,8 +735,37 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
           enabled: record?.config.enabled ?? false,
           autoUpdate: record?.config.autoUpdate ?? true,
           connectionId,
+          reasoningMode,
         },
         origin,
+        record?.archives,
+      )
+      return
+    }
+
+    if (msg.type === 'set_reasoning_mode') {
+      const reasoningMode = normalizeReasoningMode(msg.reasoningMode)
+      const prevUserConfig = await readUserConfig(userId)
+      await writeUserConfig(userId, { connectionId: prevUserConfig.connectionId, reasoningMode })
+      const activeChatId = await getActiveChatId(userId)
+      const rt = activeChatId ? getRuntime(userId, activeChatId) : null
+      const record = rt ? await loadChatRecord(rt) : null
+      emitStatus(
+        userId,
+        activeChatId,
+        'ready',
+        reasoningMode === 'off'
+          ? 'Reasoning disabled (faster, direct JSON).'
+          : 'Reasoning enabled (inherits connection thinking settings).',
+        record?.state ?? null,
+        {
+          enabled: record?.config.enabled ?? false,
+          autoUpdate: record?.config.autoUpdate ?? true,
+          connectionId: prevUserConfig.connectionId,
+          reasoningMode,
+        },
+        origin,
+        record?.archives,
       )
       return
     }
@@ -680,8 +793,13 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
               : 'Atlas enabled (manual updates only).'
             : 'Atlas paused for this chat.',
           nextRecord.state,
-          { ...nextConfig, connectionId: userConfig.connectionId },
+          {
+            ...nextConfig,
+            connectionId: userConfig.connectionId,
+            reasoningMode: userConfig.reasoningMode ?? 'inherit',
+          },
           origin,
+          nextRecord.archives,
         )
       })
       return

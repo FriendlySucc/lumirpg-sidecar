@@ -101,12 +101,14 @@ export interface ChatConfig {
 
 export interface UserConfig {
   connectionId: string | null
+  reasoningMode?: 'inherit' | 'off'
 }
 
 export interface EffectiveConfig {
   enabled: boolean
   autoUpdate: boolean
   connectionId: string | null
+  reasoningMode: 'inherit' | 'off'
 }
 
 export interface StoredChatRecord {
@@ -124,6 +126,7 @@ export type BackendToFrontendMessage =
       config: EffectiveConfig
       connections: ConnectionOption[]
       state: AtlasState | null
+      archives?: Record<Scale, MapLayer[]>
       busy: boolean
       statusMessage: string
       error: string | null
@@ -134,12 +137,22 @@ export type BackendToFrontendMessage =
       status: 'idle' | 'updating' | 'ready' | 'stale' | 'error'
       message: string
       state?: AtlasState | null
+      archives?: Record<Scale, MapLayer[]>
       config?: EffectiveConfig
+    }
+  | {
+      type: 'stream'
+      chatId: string
+      phase: 'thinking' | 'writing'
+      reasoning: string
+      outputChars: number
+      outputTail: string
     }
 
 export type FrontendToBackendMessage =
   | { type: 'init'; requestId?: string | null; chatId?: string | null }
   | { type: 'set_connection'; connectionId: string | null }
+  | { type: 'set_reasoning_mode'; reasoningMode: 'inherit' | 'off' }
   | { type: 'set_chat_config'; chatId: string; enabled?: boolean; autoUpdate?: boolean }
   | { type: 'analyze'; chatId: string; mode: 'update' | 'rebuild' }
   | { type: 'cancel'; chatId: string }

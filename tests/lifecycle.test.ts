@@ -281,24 +281,82 @@ describe('LumiAtlas frontend host lifecycle', () => {
     expect(initReq.requestId).toBe('uuid-v4-1')
     expect(initReq.chatId).toBe('chat_abc')
 
-    // Push init payload with sample 3-layer Atlas
+    // Push init payload with sample 3-layer Atlas + an archived local zone
     host.emitBackend({
       type: 'init',
       requestId: initReq.requestId,
       activeChatId: 'chat_abc',
-      config: { enabled: true, autoUpdate: true, connectionId: 'conn_terra' },
+      config: { enabled: true, autoUpdate: true, connectionId: 'conn_terra', reasoningMode: 'inherit' },
       connections: [{ id: 'conn_terra', name: 'cheap', model: 'gpt-6.1-terra', provider: 'custom' }],
       state: makeSampleState('chat_abc'),
+      archives: {
+        local: [
+          {
+            id: 'apartment_local',
+            name: 'Kris Apartment',
+            scale: 'local',
+            currentTileId: 'bedroom',
+            activeFloor: 0,
+            tiles: [
+              {
+                id: 'bedroom',
+                name: 'Bedroom',
+                kind: 'room',
+                status: 'visited',
+                x: 0,
+                y: 0,
+                w: 10,
+                h: 10,
+                floor: 0,
+                sizeLabel: '10 m',
+                summary: 'Small apartment bedroom.',
+                features: ['Bunk'],
+                pins: [],
+                connections: [],
+              },
+            ],
+            roads: [],
+          },
+        ],
+        region: [],
+        world: [],
+      },
       busy: false,
       statusMessage: 'Atlas ready.',
       error: null,
     })
+
+    // Empty overlay is hidden once tiles render
+    const emptyOverlay = host.tabRoot.querySelector('.la-empty-overlay') as HTMLElement
+    expect(emptyOverlay.hidden).toBe(true)
 
     // Local tiles rendered in SVG
     const localTiles = host.tabRoot.querySelectorAll('.la-tile-group')
     expect(localTiles.length).toBe(2)
     expect(host.tabRoot.textContent).toContain('Noodle Counter')
     expect(host.tabRoot.textContent).toContain('Arcade Walkway')
+
+    // Local tileset dropdown lists current + archived zone and switches cleanly
+    const layerSelect = host.tabRoot.querySelector('.la-layer-select') as HTMLSelectElement
+    expect(layerSelect.options.length).toBe(2)
+    layerSelect.value = 'apartment_local'
+    layerSelect.dispatchEvent(new win.Event('change') as unknown as Event)
+    expect(host.tabRoot.textContent).toContain('Bedroom')
+    layerSelect.value = 'kabuki_market_local'
+    layerSelect.dispatchEvent(new win.Event('change') as unknown as Event)
+
+    // Live stream thinking preview renders reasoning tokens
+    host.emitBackend({
+      type: 'stream',
+      chatId: 'chat_abc',
+      phase: 'thinking',
+      reasoning: 'Charting Kabuki Market exits and pins...',
+      outputChars: 0,
+      outputTail: '',
+    })
+    const thinkingBox = host.tabRoot.querySelector('.la-thinking') as HTMLElement
+    expect(thinkingBox.hidden).toBe(false)
+    expect(thinkingBox.textContent).toContain('Charting Kabuki Market exits and pins...')
 
     // Switch to World scale and verify region tiles + off-screen character pin
     const worldBtn = Array.from(host.tabRoot.querySelectorAll('.la-scale-tab')).find(

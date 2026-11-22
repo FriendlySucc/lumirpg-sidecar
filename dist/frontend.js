@@ -243,6 +243,7 @@ var STYLES = `
   background: #2c3047;
 }
 .la-btn:disabled { opacity: 0.48; cursor: not-allowed; }
+.la-btn[hidden] { display: none; }
 .la-btn-primary {
   background: var(--lumiverse-primary, #7c6cf6);
   border-color: var(--lumiverse-primary, #7c6cf6);
@@ -408,10 +409,93 @@ var STYLES = `
   background: rgba(19, 22, 34, 0.72);
   pointer-events: none;
 }
+.la-empty-overlay[hidden] { display: none; }
 .la-empty-overlay strong {
   color: var(--lumiverse-text, #eef0f7);
   font-size: 14px;
 }
+.la-layer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.la-layer-bar[hidden] { display: none; }
+.la-layer-bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lumiverse-text-muted, #aeb4c8);
+  white-space: nowrap;
+}
+.la-layer-select {
+  flex: 1 1 160px;
+  min-width: 140px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--lumiverse-border, #3e4359);
+  background: #171926;
+  color: var(--lumiverse-text, #eef0f7);
+  font: inherit;
+  font-size: 12px;
+}
+.la-thinking {
+  border: 1px solid var(--lumiverse-border, #3e4359);
+  border-radius: 10px;
+  background: #191c2b;
+  overflow: hidden;
+}
+.la-thinking[hidden] { display: none; }
+.la-thinking-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(124, 108, 246, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  user-select: none;
+}
+.la-thinking-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dcd6ff;
+}
+.la-thinking-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lumiverse-primary, #9b8cff);
+  flex: none;
+}
+.la-thinking-dot.la-pulse {
+  animation: la-pulse-anim 1.2s ease-in-out infinite;
+}
+@keyframes la-pulse-anim {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+.la-thinking-meta {
+  font-size: 11px;
+  color: var(--lumiverse-text-muted, #9ea5bc);
+}
+.la-thinking-body {
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 150px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #c5cbe3;
+  background: #141724;
+}
+.la-thinking-body[hidden] { display: none; }
 .la-hud-corner {
   position: absolute;
   right: 8px;
@@ -630,13 +714,17 @@ function setup(ctx) {
   const removeStyle = ctx.dom.addStyle(STYLES);
   const state = {
     activeChatId: ctx.getActiveChat().chatId,
-    config: { enabled: false, autoUpdate: true, connectionId: null },
+    config: { enabled: false, autoUpdate: true, connectionId: null, reasoningMode: "inherit" },
     connections: [],
     atlas: null,
+    archives: { local: [], region: [], world: [] },
+    selectedLayerId: { local: null, region: null, world: null },
     scale: "local",
     floor: 0,
     selectedTileId: null,
     busy: false,
+    stream: null,
+    thinkingOpen: true,
     statusMessage: "Loading Atlas…",
     error: null,
     settingsOpen: false,
@@ -675,13 +763,28 @@ function setup(ctx) {
   const autoInput = el("input");
   autoInput.type = "checkbox";
   autoLabel.append(autoInput, document.createTextNode("Auto-update after replies"));
+  const reasoningLabel = el("label", "la-check");
+  const reasoningInput = el("input");
+  reasoningInput.type = "checkbox";
+  reasoningLabel.append(reasoningInput, document.createTextNode("Show model thinking"));
   const refreshBtn = el("button", "la-btn", "Reload");
-  toggles.append(enabledLabel, autoLabel, refreshBtn);
+  toggles.append(enabledLabel, autoLabel, reasoningLabel, refreshBtn);
   settingsBox.append(connField, toggles);
   const errorBanner = el("div", "la-banner la-banner-error");
   errorBanner.hidden = true;
   const staleBanner = el("div", "la-banner la-banner-stale");
   staleBanner.hidden = true;
+  const thinkingBox = el("div", "la-thinking");
+  thinkingBox.hidden = true;
+  const thinkingHead = el("div", "la-thinking-head");
+  const thinkingTitle = el("div", "la-thinking-title");
+  const thinkingDot = el("span", "la-thinking-dot la-pulse");
+  const thinkingLabel = el("span", undefined, "Model thinking…");
+  thinkingTitle.append(thinkingDot, thinkingLabel);
+  const thinkingMeta = el("span", "la-thinking-meta", "");
+  thinkingHead.append(thinkingTitle, thinkingMeta);
+  const thinkingBody = el("pre", "la-thinking-body", "");
+  thinkingBox.append(thinkingHead, thinkingBody);
   const toolbar = el("div", "la-toolbar");
   const scaleTabs = el("div", "la-scale-tabs");
   scaleTabs.setAttribute("role", "tablist");
@@ -702,6 +805,12 @@ function setup(ctx) {
   const labelsToggle = el("button", "la-btn la-btn-active", "Labels");
   layerTools.append(floorBar, pinsToggle, roadsToggle, labelsToggle);
   toolbar.append(scaleTabs, layerTools);
+  const layerBar = el("div", "la-layer-bar");
+  layerBar.hidden = true;
+  const layerBarLabel = el("span", "la-layer-bar-label", "Zone");
+  const layerSelect = el("select", "la-layer-select");
+  layerSelect.setAttribute("aria-label", "Select generated map tileset");
+  layerBar.append(layerBarLabel, layerSelect);
   const canvasWrap = el("div", "la-canvas-wrap");
   const svg = svgEl("svg", {
     class: "la-svg",
@@ -720,7 +829,7 @@ function setup(ctx) {
   const emptyOverlay = el("div", "la-empty-overlay");
   canvasWrap.append(svg, hudBadge, hudCorner, emptyOverlay);
   const inspector = el("div", "la-inspector");
-  root.append(header, settingsBox, errorBanner, staleBanner, toolbar, canvasWrap, inspector);
+  root.append(header, settingsBox, errorBanner, staleBanner, thinkingBox, toolbar, layerBar, canvasWrap, inspector);
   tab.root.replaceChildren(root);
   function send(msg) {
     if (state.destroyed)
@@ -734,8 +843,32 @@ function setup(ctx) {
     state.activeChatId = active.chatId;
     send({ type: "init", requestId: reqId, chatId: active.chatId });
   }
+  function availableLayers(scale) {
+    const result = [];
+    const seen = new Set;
+    const active = state.atlas?.maps?.[scale];
+    if (active && active.tiles.length > 0) {
+      result.push(active);
+      seen.add(active.id);
+    }
+    for (const archived of state.archives[scale] ?? []) {
+      if (archived && archived.tiles.length > 0 && !seen.has(archived.id)) {
+        result.push(archived);
+        seen.add(archived.id);
+      }
+    }
+    return result;
+  }
   function currentLayer() {
-    return state.atlas?.maps?.[state.scale] ?? null;
+    const active = state.atlas?.maps?.[state.scale] ?? null;
+    const pickedId = state.selectedLayerId[state.scale];
+    if (pickedId) {
+      const list = availableLayers(state.scale);
+      const match = list.find((l) => l.id === pickedId);
+      if (match)
+        return match;
+    }
+    return active;
   }
   function fitCamera(force = false) {
     const layer = currentLayer();
@@ -1093,15 +1226,66 @@ ${tile.summary}` : ""}`;
     enabledInput.disabled = !hasChat;
     autoInput.checked = state.config.autoUpdate;
     autoInput.disabled = !hasChat || !state.config.enabled;
+    reasoningInput.checked = state.config.reasoningMode !== "off";
     errorBanner.hidden = !state.error;
     errorBanner.textContent = state.error ?? "";
     staleBanner.hidden = !state.atlas?.stale;
     staleBanner.textContent = state.atlas?.staleReason ?? "";
+    const hasStream = state.busy || Boolean(state.stream && (state.stream.reasoning || state.stream.outputChars > 0));
+    thinkingBox.hidden = !hasStream;
+    if (hasStream) {
+      const phase = state.stream?.phase ?? "thinking";
+      const reasoningText = state.stream?.reasoning ?? "";
+      const outChars = state.stream?.outputChars ?? 0;
+      thinkingDot.classList.toggle("la-pulse", state.busy);
+      if (state.busy) {
+        thinkingLabel.textContent = phase === "writing" ? "Writing Atlas JSON…" : reasoningText ? "Model thinking…" : "Waiting for model…";
+      } else {
+        thinkingLabel.textContent = reasoningText ? "Last generation thoughts" : "Last generation output";
+      }
+      const metaParts = [];
+      if (reasoningText)
+        metaParts.push(`${reasoningText.length} thinking chars`);
+      if (outChars > 0)
+        metaParts.push(`${outChars} JSON chars`);
+      metaParts.push(state.thinkingOpen ? "Hide" : "Show");
+      thinkingMeta.textContent = metaParts.join(" · ");
+      thinkingBody.hidden = !state.thinkingOpen;
+      if (state.thinkingOpen) {
+        if (reasoningText) {
+          thinkingBody.textContent = reasoningText;
+        } else if (state.stream?.outputTail) {
+          thinkingBody.textContent = `Generating map JSON (${outChars} chars)…
+${state.stream.outputTail}`;
+        } else if (state.busy) {
+          thinkingBody.textContent = state.config.reasoningMode === "off" ? "Streaming JSON directly (thinking disabled in Settings)…" : "Waiting for reasoning tokens from model…";
+        } else {
+          thinkingBody.textContent = "";
+        }
+        thinkingBody.scrollTop = thinkingBody.scrollHeight;
+      }
+    }
     for (const s of ["local", "region", "world"]) {
       const count = state.atlas?.maps?.[s]?.tiles.length ?? 0;
       const label = s === "local" ? "Local" : s === "region" ? "Region" : "World";
       scaleButtons[s].textContent = count > 0 ? `${label} (${count})` : label;
       scaleButtons[s].setAttribute("aria-selected", String(state.scale === s));
+    }
+    const layers = availableLayers(state.scale);
+    const showLayerDropdown = (state.scale === "local" || state.scale === "region") && layers.length > 0;
+    layerBar.hidden = !showLayerDropdown;
+    if (showLayerDropdown) {
+      layerBarLabel.textContent = state.scale === "local" ? "Local Zone" : "Region";
+      layerSelect.replaceChildren();
+      const activeId = state.atlas?.maps?.[state.scale]?.id ?? null;
+      for (const l of layers) {
+        const isCurrent = l.id === activeId;
+        const opt = el("option", undefined, `${l.name} (${l.tiles.length} tiles)${isCurrent ? " · Current" : ""}`);
+        opt.value = l.id;
+        layerSelect.append(opt);
+      }
+      const currentId = currentLayer()?.id ?? layers[0]?.id ?? "";
+      layerSelect.value = currentId;
     }
     floorBar.replaceChildren();
     const layer = currentLayer();
@@ -1165,6 +1349,26 @@ ${tile.summary}` : ""}`;
     });
     renderAll();
   });
+  on(reasoningInput, "change", () => {
+    const reasoningMode = reasoningInput.checked ? "inherit" : "off";
+    state.config.reasoningMode = reasoningMode;
+    send({ type: "set_reasoning_mode", reasoningMode });
+    renderAll();
+  });
+  on(thinkingHead, "click", () => {
+    state.thinkingOpen = !state.thinkingOpen;
+    renderAll();
+  });
+  on(layerSelect, "change", () => {
+    const picked = layerSelect.value || null;
+    const activeId = state.atlas?.maps?.[state.scale]?.id ?? null;
+    state.selectedLayerId[state.scale] = picked === activeId ? null : picked;
+    const layer = currentLayer();
+    state.floor = layer?.activeFloor ?? 0;
+    state.selectedTileId = layer?.currentTileId ?? null;
+    fitCamera(true);
+    renderAll();
+  });
   on(refreshBtn, "click", () => {
     state.error = null;
     requestInit();
@@ -1174,6 +1378,8 @@ ${tile.summary}` : ""}`;
       return;
     state.error = null;
     state.busy = true;
+    state.stream = { phase: "thinking", reasoning: "", outputChars: 0, outputTail: "" };
+    state.thinkingOpen = true;
     state.statusMessage = "Requesting Atlas update…";
     send({ type: "analyze", chatId: state.activeChatId, mode: "update" });
     renderAll();
@@ -1183,6 +1389,8 @@ ${tile.summary}` : ""}`;
       return;
     state.error = null;
     state.busy = true;
+    state.stream = { phase: "thinking", reasoning: "", outputChars: 0, outputTail: "" };
+    state.thinkingOpen = true;
     state.statusMessage = "Requesting fresh 3-layer rebuild…";
     send({ type: "analyze", chatId: state.activeChatId, mode: "rebuild" });
     renderAll();
@@ -1197,8 +1405,9 @@ ${tile.summary}` : ""}`;
       if (state.scale === s)
         return;
       state.scale = s;
-      state.selectedTileId = null;
-      state.floor = state.atlas?.maps?.[s]?.activeFloor ?? 0;
+      const layer = currentLayer();
+      state.selectedTileId = layer?.currentTileId ?? null;
+      state.floor = layer?.activeFloor ?? 0;
       fitCamera(true);
       renderAll();
     });
@@ -1270,7 +1479,11 @@ ${tile.summary}` : ""}`;
       state.config = msg.config;
       state.connections = msg.connections;
       state.atlas = msg.state;
+      state.archives = msg.archives ?? { local: [], region: [], world: [] };
+      state.selectedLayerId = { local: null, region: null, world: null };
       state.busy = msg.busy;
+      if (!msg.busy)
+        state.stream = null;
       state.statusMessage = msg.statusMessage;
       state.error = msg.error;
       if (!msg.config.connectionId)
@@ -1281,13 +1494,31 @@ ${tile.summary}` : ""}`;
       renderAll();
       return;
     }
+    if (msg.type === "stream") {
+      if (msg.chatId && state.activeChatId && msg.chatId !== state.activeChatId)
+        return;
+      state.busy = true;
+      state.stream = {
+        phase: msg.phase,
+        reasoning: msg.reasoning,
+        outputChars: msg.outputChars,
+        outputTail: msg.outputTail
+      };
+      renderAll();
+      return;
+    }
     if (msg.type === "status") {
       if (msg.chatId && state.activeChatId && msg.chatId !== state.activeChatId)
         return;
       if (msg.config)
         state.config = msg.config;
+      if (msg.archives)
+        state.archives = msg.archives;
       if (msg.state !== undefined) {
         state.atlas = msg.state;
+        if (msg.status === "ready") {
+          state.selectedLayerId = { local: null, region: null, world: null };
+        }
         if (msg.state && !state.selectedTileId) {
           state.selectedTileId = msg.state.maps[state.scale]?.currentTileId ?? null;
         }
@@ -1297,11 +1528,18 @@ ${tile.summary}` : ""}`;
       state.error = msg.status === "error" ? msg.message : null;
       if (msg.status === "ready") {
         tab.setBadge(null);
-        fitCamera(false);
+        if (state.stream && !state.stream.reasoning) {
+          state.stream = null;
+        } else if (state.stream) {
+          state.thinkingOpen = false;
+        }
+        fitCamera(true);
       } else if (msg.status === "updating") {
         tab.setBadge("…");
       } else if (msg.status === "stale") {
         tab.setBadge("!");
+      } else if (msg.status === "idle" || msg.status === "error") {
+        tab.setBadge(null);
       }
       renderAll();
     }
@@ -1310,8 +1548,11 @@ ${tile.summary}` : ""}`;
     const nextId = payload && typeof payload === "object" && typeof payload.chatId === "string" ? payload.chatId : null;
     state.activeChatId = nextId;
     state.atlas = null;
+    state.archives = { local: [], region: [], world: [] };
+    state.selectedLayerId = { local: null, region: null, world: null };
     state.selectedTileId = null;
     state.busy = false;
+    state.stream = null;
     state.error = null;
     state.statusMessage = nextId ? "Loading Atlas…" : "Open a chat to view its Atlas.";
     state.cameraScaleKey = "";
