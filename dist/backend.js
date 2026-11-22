@@ -751,15 +751,21 @@ async function runAnalysis(rt, mode, trigger, origin) {
     spindle.log.info(`LumiAtlas: starting ${mode} (${runId}) on chat ${rt.chatId} via ${chosen.name} (${chosen.model})`);
     emitStatus(rt.userId, rt.chatId, "updating", mode === "rebuild" ? `Rebuilding 3-layer Atlas with ${chosen.name}\u2026` : `Charting map update with ${chosen.name}\u2026`, record.state, { ...record.config, connectionId: userConfig.connectionId }, origin);
     const userPrompt = buildAtlasPrompt(messages, mode === "rebuild" ? null : record.state, mode);
+    const effectiveModel = chosen.model.trim();
+    const genParams = { temperature: 0.2, max_tokens: 4800 };
+    if (effectiveModel)
+      genParams.model = effectiveModel;
     const rawResult = await spindle.generate.raw({
       type: "raw",
       connection_id: chosen.id,
+      ...chosen.provider ? { provider: chosen.provider } : {},
+      ...effectiveModel ? { model: effectiveModel } : {},
       userId: rt.userId,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt }
       ],
-      parameters: { temperature: 0.2, max_tokens: 4800 },
+      parameters: genParams,
       reasoning: { source: "off" },
       signal: controller.signal
     });

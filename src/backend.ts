@@ -376,18 +376,23 @@ async function runAnalysis(
     )
 
     const userPrompt = buildAtlasPrompt(messages, mode === 'rebuild' ? null : record.state, mode)
+    const effectiveModel = chosen.model.trim()
+    const genParams: Record<string, unknown> = { temperature: 0.2, max_tokens: 4800 }
+    if (effectiveModel) genParams.model = effectiveModel
     const rawResult = await spindle.generate.raw({
       type: 'raw',
       connection_id: chosen.id,
+      ...(chosen.provider ? { provider: chosen.provider } : {}),
+      ...(effectiveModel ? { model: effectiveModel } : {}),
       userId: rt.userId,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
-      parameters: { temperature: 0.2, max_tokens: 4800 },
+      parameters: genParams,
       reasoning: { source: 'off' },
       signal: controller.signal,
-    })
+    } as Parameters<typeof spindle.generate.raw>[0])
 
     if (controller.signal.aborted || myEpoch !== rt.epoch) return
 
