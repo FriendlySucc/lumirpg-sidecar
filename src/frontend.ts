@@ -587,6 +587,97 @@ function getFloors(layer: MapLayer): number[] {
   return floors.length ? floors : [0]
 }
 
+function wrapTextLines(raw: string, maxCharsPerLine: number, maxLines: number): string[] {
+  const text = raw.trim()
+  if (!text) return []
+  const limit = Math.max(4, Math.floor(maxCharsPerLine))
+  const words = text.split(/\s+/)
+  const lines: string[] = []
+  let current = ''
+
+  for (const word of words) {
+    if (!current) {
+      if (word.length <= limit) {
+        current = word
+      } else {
+        lines.push(`${word.slice(0, Math.max(3, limit - 1))}…`)
+      }
+    } else if (current.length + 1 + word.length <= limit) {
+      current = `${current} ${word}`
+    } else {
+      lines.push(current)
+      if (word.length <= limit) {
+        current = word
+      } else {
+        current = `${word.slice(0, Math.max(3, limit - 1))}…`
+      }
+    }
+    if (lines.length >= maxLines) break
+  }
+
+  if (lines.length < maxLines && current) {
+    lines.push(current)
+  }
+
+  // If we truncated words, ensure last line ends with ellipsis
+  const consumed = lines.join(' ').replace(/…/g, '')
+  if (lines.length === maxLines && consumed.length < text.length) {
+    const last = lines[maxLines - 1]
+    if (!last.endsWith('…')) {
+      lines[maxLines - 1] =
+        last.length >= limit
+          ? `${last.slice(0, Math.max(3, limit - 1))}…`
+          : `${last}…`
+    }
+  }
+
+  return lines.slice(0, maxLines)
+}
+
+function shortPinLabel(name: string, maxChars: number): string {
+  const clean = name.trim()
+  if (clean.length <= maxChars) return clean
+  const first = clean.split(/\s+/)[0] || clean
+  if (first.length <= maxChars) return first
+  return `${first.slice(0, Math.max(3, maxChars - 1))}…`
+}
+
+interface PinPlacement {
+  pin: Tile['pins'][number]
+  px: number
+  py: number
+  row: number
+  colsInRow: number
+}
+
+/** Arrange pins cleanly in the tile's dedicated lower pin zone so they never cover labels or stack. */
+function layoutTilePins(tile: Tile): PinPlacement[] {
+  const pins = tile.pins
+  if (!pins.length) return []
+  // Sort player first or preserve left-to-right hint from pin.x
+  const ordered = [...pins].sort((a, b) => a.x - b.x)
+  const maxPerRow = tile.w >= 25 ? 4 : tile.w >= 15 ? 3 : tile.w >= 10 ? 2 : 1
+  const rows = Math.ceil(ordered.length / maxPerRow)
+  const placements: PinPlacement[] = []
+
+  const bandTop = tile.y + tile.h * (rows > 1 ? 0.56 : 0.64)
+  const bandBottom = tile.y + tile.h * 0.79
+  const bandHeight = Math.max(1.2, bandBottom - bandTop)
+
+  for (let i = 0; i < ordered.length; i++) {
+    const row = Math.floor(i / maxPerRow)
+    const col = i % maxPerRow
+    const colsInRow = Math.min(maxPerRow, ordered.length - row * maxPerRow)
+    const fracX = (col + 0.5) / colsInRow
+    const padX = Math.min(2.2, tile.w * 0.16)
+    const usableW = Math.max(1, tile.w - padX * 2)
+    const px = tile.x + padX + usableW * fracX
+    const py = rows === 1 ? bandTop + bandHeight * 0.45 : bandTop + (bandHeight * (row + 0.5)) / rows
+    placements.push({ pin: ordered[i], px, py, row, colsInRow })
+  }
+  return placements
+}
+
 export function setup(ctx: SpindleFrontendContext) {
   let reqCounter = 0
   let pendingRequestId: string | null = null
@@ -908,7 +999,22 @@ export function setup(ctx: SpindleFrontendContext) {
 
     const tileById = new Map(tiles.map((t) => [t.id, t]))
 
-    // 1. Tiles layer
+    // Register per-tile clipPaths so labels and sheens never bleed outside tile borders
+    for (const tile of tiles) {
+      const clip = svgEl('clipPath', { id: `la-clip-${tile.id}` })
+      clip.append(
+        svgEl('rect', {
+          x: tile.x + 0.35,
+          y: tile.y + 0.35,
+          width: Math.max(0.5, tile.w - 0.7),
+          height: Math.max(0.5, tile.h - 0.7),
+          rx: state.scale === 'local' ? 0.6 : 1.0,
+        }),
+      )
+      defs.append(clip)
+    }
+
+    // 1. Tiles layer (fills, borders, click targets)
     const tilesLayer = svgEl('g', { class: 'la-layer-tiles' })
     for (const tile of tiles) {
       const isCurrent = layer.currentTileId === tile.id || tile.status === 'current'
@@ -940,46 +1046,15 @@ export function setup(ctx: SpindleFrontendContext) {
       if (!isFog) {
         g.append(
           svgEl('rect', {
-            x: tile.x + 0.2,
-            y: tile.y + 0.2,
-            width: Math.max(0, tile.w - 0.4),
-            height: Math.max(0, tile.h * 0.32),
+            x: tile.x + 0.25,
+            y: tile.y + 0.25,
+            width: Math.max(0, tile.w - 0.5),
+            height: Math.max(0, tile.h * 0.28),
+            rx: state.scale === 'local' ? 0.6 : 0.9,
             fill: 'rgba(255,255,255,0.06)',
             'pointer-events': 'none',
           }),
         )
-      }
-
-      if (state.showLabels) {
-        const cx = tile.x + tile.w / 2
-        const cy = tile.y + tile.h / 2
-        const fontSize = Math.max(1.5, Math.min(3.1, Math.min(tile.w / 6.2, tile.h / 3.4)))
-        const displayName =
-          tile.name.length > Math.floor(tile.w * 1.45)
-            ? `${tile.name.slice(0, Math.max(6, Math.floor(tile.w * 1.45) - 1))}…`
-            : tile.name
-
-        const label = svgEl('text', {
-          class: 'la-tile-label',
-          x: cx,
-          y: tile.sizeLabel ? cy - fontSize * 0.25 : cy + fontSize * 0.32,
-          'text-anchor': 'middle',
-          'font-size': fontSize.toFixed(2),
-        })
-        label.textContent = isFog ? `🔒 ${displayName}` : displayName
-        g.append(label)
-
-        if (tile.sizeLabel && !isFog) {
-          const sizeText = svgEl('text', {
-            class: 'la-tile-size',
-            x: cx,
-            y: cy + fontSize * 0.95,
-            'text-anchor': 'middle',
-            'font-size': (fontSize * 0.72).toFixed(2),
-          })
-          sizeText.textContent = tile.sizeLabel
-          g.append(sizeText)
-        }
       }
 
       const titleTag = svgEl('title')
@@ -996,9 +1071,9 @@ export function setup(ctx: SpindleFrontendContext) {
     }
     svg.append(tilesLayer)
 
-    // 2. Roads & Doors layer
+    // 2. Roads & Doors layer (under labels & pins so routes never strike through text)
     if (state.showRoads && layer.roads.length > 0) {
-      const roadsLayer = svgEl('g', { class: 'la-layer-roads', 'pointer-events': 'none' })
+      const roadsLayer = svgEl('g', { class: 'la-layer-roads', 'pointer-events': 'none', opacity: '0.82' })
       for (const road of layer.roads) {
         const a = tileById.get(road.from)
         const b = tileById.get(road.to)
@@ -1006,7 +1081,7 @@ export function setup(ctx: SpindleFrontendContext) {
 
         const shared = findSharedEdge(a, b)
         if (state.scale === 'local' && shared && road.kind === 'door') {
-          const doorLen = 2.4
+          const doorLen = 2.2
           const x1 = shared.orientation === 'horizontal' ? shared.midX - doorLen / 2 : shared.midX
           const y1 = shared.orientation === 'vertical' ? shared.midY - doorLen / 2 : shared.midY
           const x2 = shared.orientation === 'horizontal' ? shared.midX + doorLen / 2 : shared.midX
@@ -1018,7 +1093,7 @@ export function setup(ctx: SpindleFrontendContext) {
               x2,
               y2,
               stroke: '#f5d08a',
-              'stroke-width': 1.15,
+              'stroke-width': 1.05,
               'stroke-linecap': 'round',
             }),
           )
@@ -1040,8 +1115,8 @@ export function setup(ctx: SpindleFrontendContext) {
               y1,
               x2,
               y2,
-              stroke: 'rgba(15,17,26,0.75)',
-              'stroke-width': road.kind === 'road' ? 1.4 : 1.0,
+              stroke: 'rgba(15,17,26,0.68)',
+              'stroke-width': road.kind === 'road' ? 1.2 : 0.88,
               'stroke-linecap': 'round',
             }),
           )
@@ -1051,11 +1126,11 @@ export function setup(ctx: SpindleFrontendContext) {
             x2,
             y2,
             stroke: strokeColor,
-            'stroke-width': road.kind === 'road' ? 0.72 : 0.5,
+            'stroke-width': road.kind === 'road' ? 0.6 : 0.42,
             'stroke-linecap': 'round',
           })
           if (road.kind === 'path' || road.kind === 'sea_route' || road.kind === 'stairs') {
-            line.setAttribute('stroke-dasharray', '1.4 1.1')
+            line.setAttribute('stroke-dasharray', '1.3 1.0')
           }
           roadsLayer.append(line)
         }
@@ -1063,49 +1138,121 @@ export function setup(ctx: SpindleFrontendContext) {
       svg.append(roadsLayer)
     }
 
-    // 3. Character Pins layer
+    // 3. Tile Labels layer (wrapped, clipped strictly inside each tile, shifted up when pins are present)
+    if (state.showLabels) {
+      const labelsLayer = svgEl('g', { class: 'la-layer-labels', 'pointer-events': 'none' })
+      for (const tile of tiles) {
+        const isFog = tile.status === 'locked' || tile.status === 'unexplored'
+        const hasPins = state.showPins && tile.pins.length > 0
+        const labelZoneH = hasPins ? tile.h * 0.56 : tile.h * 0.86
+        const labelZoneTop = tile.y + (hasPins ? tile.h * 0.06 : tile.h * 0.07)
+        const cx = tile.x + tile.w / 2
+        const usableW = Math.max(2.6, tile.w - 1.4)
+
+        const baseFont = Math.max(
+          0.95,
+          Math.min(
+            state.scale === 'local' ? 1.95 : 2.35,
+            usableW / 6.6,
+            labelZoneH / (tile.sizeLabel && !isFog ? 3.8 : 2.6),
+          ),
+        )
+        const maxChars = Math.max(4, Math.floor(usableW / (baseFont * 0.6)))
+        const maxLines = labelZoneH >= baseFont * 4.2 ? 3 : labelZoneH >= baseFont * 2.5 ? 2 : 1
+        const rawLabel = isFog ? `🔒 ${tile.name}` : tile.name
+        const lines = wrapTextLines(rawLabel, maxChars, maxLines)
+        const lineHeight = baseFont * 1.18
+        const sizeFont = baseFont * 0.72
+        const showSize = Boolean(tile.sizeLabel && !isFog && labelZoneH >= lines.length * lineHeight + sizeFont * 1.4)
+        const totalTextH = lines.length * lineHeight + (showSize ? sizeFont * 1.35 : 0)
+        const startY = labelZoneTop + (labelZoneH - totalTextH) / 2 + baseFont * 0.88
+
+        const clippedGroup = svgEl('g', { 'clip-path': `url(#la-clip-${tile.id})` })
+        const labelEl = svgEl('text', {
+          class: 'la-tile-label',
+          x: cx,
+          y: startY.toFixed(2),
+          'text-anchor': 'middle',
+          'font-size': baseFont.toFixed(2),
+        })
+
+        lines.forEach((lineText, idx) => {
+          const tspan = svgEl('tspan', {
+            x: cx,
+            dy: idx === 0 ? '0' : lineHeight.toFixed(2),
+          })
+          tspan.textContent = lineText
+          labelEl.append(tspan)
+        })
+        clippedGroup.append(labelEl)
+
+        if (showSize) {
+          const sizeY = startY + (lines.length - 1) * lineHeight + sizeFont * 1.45
+          const sizeText = svgEl('text', {
+            class: 'la-tile-size',
+            x: cx,
+            y: sizeY.toFixed(2),
+            'text-anchor': 'middle',
+            'font-size': sizeFont.toFixed(2),
+          })
+          sizeText.textContent = tile.sizeLabel
+          clippedGroup.append(sizeText)
+        }
+
+        labelsLayer.append(clippedGroup)
+      }
+      svg.append(labelsLayer)
+    }
+
+    // 4. Character Pins layer (dedicated lower pin band inside each tile, clipped and scaled)
     if (state.showPins) {
       const pinsLayer = svgEl('g', { class: 'la-layer-pins' })
       for (const tile of tiles) {
         if (!tile.pins.length) continue
-        for (const pin of tile.pins) {
-          const px = tile.x + tile.w * pin.x
-          const py = tile.y + tile.h * pin.y
+        const placements = layoutTilePins(tile)
+        const tilePinGroup = svgEl('g', { 'clip-path': `url(#la-clip-${tile.id})` })
+        const dotBase = Math.max(0.55, Math.min(0.92, Math.min(tile.w, tile.h) * 0.055))
+        const pinFont = Math.max(0.85, Math.min(1.28, tile.w / (Math.max(1, placements[0]?.colsInRow ?? 1) * 6.4)))
+
+        for (const { pin, px, py, colsInRow } of placements) {
           const color = defaultPinColor(pin)
           const pinGroup = svgEl('g', { style: 'cursor:pointer' })
+          const dotR = pin.isPlayer ? dotBase * 1.18 : dotBase
 
           if (pin.isPlayer) {
             pinGroup.append(
               svgEl('circle', {
-                cx: px,
-                cy: py,
-                r: 2.0,
-                fill: 'rgba(254, 240, 138, 0.28)',
+                cx: px.toFixed(2),
+                cy: py.toFixed(2),
+                r: (dotR * 1.75).toFixed(2),
+                fill: 'rgba(254, 240, 138, 0.26)',
                 stroke: '#fde047',
-                'stroke-width': 0.3,
+                'stroke-width': 0.24,
               }),
             )
           }
 
           pinGroup.append(
             svgEl('circle', {
-              cx: px,
-              cy: py,
-              r: pin.isPlayer ? 1.15 : 0.95,
+              cx: px.toFixed(2),
+              cy: py.toFixed(2),
+              r: dotR.toFixed(2),
               fill: color,
               stroke: '#0f111a',
-              'stroke-width': 0.35,
+              'stroke-width': 0.28,
             }),
           )
 
+          const slotW = Math.max(3, (tile.w - 1.2) / Math.max(1, colsInRow))
+          const maxPinChars = Math.max(4, Math.floor(slotW / (pinFont * 0.6)))
           const pinLabel = svgEl('text', {
             class: 'la-pin-label',
-            x: px,
-            y: py - 1.5,
+            x: px.toFixed(2),
+            y: (py + dotR + pinFont * 1.05).toFixed(2),
             'text-anchor': 'middle',
-            'font-size': '1.65',
+            'font-size': pinFont.toFixed(2),
           })
-          pinLabel.textContent = pin.name
+          pinLabel.textContent = shortPinLabel(pin.name, maxPinChars)
           pinGroup.append(pinLabel)
 
           const pinTitle = svgEl('title')
@@ -1118,8 +1265,9 @@ export function setup(ctx: SpindleFrontendContext) {
             renderAll()
           })
 
-          pinsLayer.append(pinGroup)
+          tilePinGroup.append(pinGroup)
         }
+        pinsLayer.append(tilePinGroup)
       }
       svg.append(pinsLayer)
     }
