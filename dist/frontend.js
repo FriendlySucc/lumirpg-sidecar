@@ -620,7 +620,7 @@ function setup(ctx) {
   const cleanups = [];
   const tab = ctx.ui.registerDrawerTab({
     id: "atlas",
-    title: "providertlas",
+    title: "LumiAtlas",
     shortName: "Atlas",
     headerTitle: "Atlas Map",
     description: "3-layer background cartographic map (Local, Region, World)",
@@ -650,7 +650,7 @@ function setup(ctx) {
   const root = el("div", "la-root");
   const header = el("div", "la-header");
   const titleGroup = el("div", "la-title-group");
-  const locationEl = el("div", "la-location", "providertlas");
+  const locationEl = el("div", "la-location", "LumiAtlas");
   const subtitleEl = el("div", "la-subtitle", "Loading…");
   titleGroup.append(locationEl, subtitleEl);
   const actions = el("div", "la-actions");
@@ -770,7 +770,7 @@ function setup(ctx) {
     if (!state.activeChatId) {
       hudBadge.textContent = "No Chat";
       emptyOverlay.hidden = false;
-      emptyOverlay.replaceChildren(el("strong", undefined, "Open a roleplay chat"), el("span", undefined, "providertlas tracks a separate 3-layer map per chat."));
+      emptyOverlay.replaceChildren(el("strong", undefined, "Open a roleplay chat"), el("span", undefined, "LumiAtlas tracks a separate 3-layer map per chat."));
       return;
     }
     hudBadge.textContent = layer && layer.tiles.length > 0 ? `${layer.name}${state.scale === "local" ? ` · F${state.floor}` : ""} (${tiles.length})` : state.scale.toUpperCase();
@@ -1070,7 +1070,7 @@ ${tile.summary}` : ""}`;
   function renderAll() {
     if (state.destroyed)
       return;
-    locationEl.textContent = state.atlas?.currentLocation && state.atlas.currentLocation !== "Unknown" ? state.atlas.currentLocation : "providertlas";
+    locationEl.textContent = state.atlas?.currentLocation && state.atlas.currentLocation !== "Unknown" ? state.atlas.currentLocation : "LumiAtlas";
     subtitleEl.textContent = state.statusMessage;
     const hasChat = !!state.activeChatId;
     const hasConn = !!state.config.connectionId;

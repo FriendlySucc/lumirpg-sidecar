@@ -132,7 +132,7 @@ async function loadChatRecord(rt: ChatRuntime): Promise<StoredChatRecord> {
       return record
     }
   } catch (err) {
-    spindle.log.warn(`providertlas: failed loading record for ${rt.chatId}: ${err instanceof Error ? err.message : String(err)}`)
+    spindle.log.warn(`LumiAtlas: failed loading record for ${rt.chatId}: ${err instanceof Error ? err.message : String(err)}`)
   }
   const fresh = defaultChatRecord(rt.chatId)
   rt.record = fresh
@@ -293,75 +293,88 @@ async function runAnalysis(
   trigger: 'auto' | 'manual',
   origin?: Origin,
 ): Promise<void> {
-  if (!spindle.permissions.has('generation')) {
-    if (trigger === 'manual') {
-      emitStatus(rt.userId, rt.chatId, 'error', 'Grant the "generation" permission in Extensions to analyze maps.', rt.record?.state ?? null, undefined, origin)
-    }
-    return
-  }
-  if (!spindle.permissions.has('chats')) {
-    if (trigger === 'manual') {
-      emitStatus(rt.userId, rt.chatId, 'error', 'Grant the "chats" permission in Extensions to read chat messages.', rt.record?.state ?? null, undefined, origin)
-    }
-    return
-  }
-
-  const userConfig = await readUserConfig(rt.userId)
-  const record = await loadChatRecord(rt)
-
-  if (trigger === 'auto' && (!record.config.enabled || !record.config.autoUpdate)) return
-
-  if (!userConfig.connectionId) {
-    if (trigger === 'manual') {
-      emitStatus(rt.userId, rt.chatId, 'error', 'Pick a background connection (e.g. Terra) in Settings first.', record.state, { ...record.config, connectionId: null }, origin)
-    }
-    return
-  }
-
-  const connections = await listConnections(rt.userId)
-  const chosen = connections.find((c) => c.id === userConfig.connectionId)
-  if (!chosen) {
-    if (trigger === 'manual') {
-      emitStatus(rt.userId, rt.chatId, 'error', 'Selected connection is no longer available. Pick another in Settings.', record.state, { ...record.config, connectionId: userConfig.connectionId }, origin)
-    }
-    return
-  }
-
-  const { messages, latestMessageId, totalRead } = await readRecentMessages(rt.chatId)
-  if (!messages.length) {
-    if (trigger === 'manual') {
-      emitStatus(rt.userId, rt.chatId, 'error', 'No visible chat messages to map yet.', record.state, undefined, origin)
-    }
-    return
-  }
-
-  if (trigger === 'auto' && latestMessageId && record.state.analyzedMessageId === latestMessageId && !record.state.stale) {
-    return
-  }
-
-  cancelRuntime(rt)
-  const myEpoch = rt.epoch
-  const controller = new AbortController()
-  rt.controller = controller
-  rt.busy = true
-  rt.timer = setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS)
-
-  const runId = (spindle.host.capabilities['uuid-v1'] ?? 0) >= 1 ? await spindle.uuid.v7() : `run_${Date.now()}`
-  spindle.log.info(`providertlas: starting ${mode} (${runId}) on chat ${rt.chatId} via ${chosen.name} (${chosen.model})`)
-
-  emitStatus(
-    rt.userId,
-    rt.chatId,
-    'updating',
-    mode === 'rebuild'
-      ? `Rebuilding 3-layer Atlas with ${chosen.name}…`
-      : `Charting map update with ${chosen.name}…`,
-    record.state,
-    { ...record.config, connectionId: userConfig.connectionId },
-    origin,
-  )
+  let myEpoch = rt.epoch
+  let controller: AbortController | null = null
+  let fallbackState: AtlasState | null = rt.record?.state ?? null
+  let runId = `run_${Date.now()}`
 
   try {
+    if (!spindle.permissions.has('generation')) {
+      if (trigger === 'manual') {
+        emitStatus(rt.userId, rt.chatId, 'error', 'Grant the "generation" permission in Extensions to analyze maps.', fallbackState, undefined, origin)
+      }
+      return
+    }
+    if (!spindle.permissions.has('chats')) {
+      if (trigger === 'manual') {
+        emitStatus(rt.userId, rt.chatId, 'error', 'Grant the "chats" permission in Extensions to access chats.', fallbackState, undefined, origin)
+      }
+      return
+    }
+    if (!spindle.permissions.has('chat_mutation')) {
+      if (trigger === 'manual') {
+        emitStatus(rt.userId, rt.chatId, 'error', 'Grant the "chat_mutation" permission in Extensions so LumiAtlas can read chat messages.', fallbackState, undefined, origin)
+      }
+      return
+    }
+
+    const userConfig = await readUserConfig(rt.userId)
+    const record = await loadChatRecord(rt)
+    fallbackState = record.state
+
+    if (trigger === 'auto' && (!record.config.enabled || !record.config.autoUpdate)) return
+
+    if (!userConfig.connectionId) {
+      if (trigger === 'manual') {
+        emitStatus(rt.userId, rt.chatId, 'error', 'Pick a background connection (e.g. Terra) in Settings first.', record.state, { ...record.config, connectionId: null }, origin)
+      }
+      return
+    }
+
+    const connections = await listConnections(rt.userId)
+    const chosen = connections.find((c) => c.id === userConfig.connectionId)
+    if (!chosen) {
+      if (trigger === 'manual') {
+        emitStatus(rt.userId, rt.chatId, 'error', 'Selected connection is no longer available. Pick another in Settings.', record.state, { ...record.config, connectionId: userConfig.connectionId }, origin)
+      }
+      return
+    }
+
+    const { messages, latestMessageId, totalRead } = await readRecentMessages(rt.chatId)
+    if (!messages.length) {
+      if (trigger === 'manual') {
+        emitStatus(rt.userId, rt.chatId, 'error', 'No visible chat messages to map yet.', record.state, undefined, origin)
+      }
+      return
+    }
+
+    if (trigger === 'auto' && latestMessageId && record.state.analyzedMessageId === latestMessageId && !record.state.stale) {
+      return
+    }
+
+    cancelRuntime(rt)
+    myEpoch = rt.epoch
+    controller = new AbortController()
+    rt.controller = controller
+    rt.busy = true
+    const activeController = controller
+    rt.timer = setTimeout(() => activeController.abort(), ANALYSIS_TIMEOUT_MS)
+
+    runId = (spindle.host.capabilities['uuid-v1'] ?? 0) >= 1 ? await spindle.uuid.v7() : `run_${Date.now()}`
+    spindle.log.info(`LumiAtlas: starting ${mode} (${runId}) on chat ${rt.chatId} via ${chosen.name} (${chosen.model})`)
+
+    emitStatus(
+      rt.userId,
+      rt.chatId,
+      'updating',
+      mode === 'rebuild'
+        ? `Rebuilding 3-layer Atlas with ${chosen.name}…`
+        : `Charting map update with ${chosen.name}…`,
+      record.state,
+      { ...record.config, connectionId: userConfig.connectionId },
+      origin,
+    )
+
     const userPrompt = buildAtlasPrompt(messages, mode === 'rebuild' ? null : record.state, mode)
     const rawResult = await spindle.generate.raw({
       type: 'raw',
@@ -413,19 +426,21 @@ async function runAnalysis(
       origin,
     )
   } catch (err) {
-    if (myEpoch !== rt.epoch) return
-    const isAbort = controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')
+    if (controller && myEpoch !== rt.epoch) return
+    const isAbort = Boolean(controller?.signal.aborted) || (err instanceof Error && err.name === 'AbortError')
     const detail = isAbort
       ? 'Atlas update was cancelled or timed out. Previous map kept.'
       : `Atlas update failed: ${err instanceof Error ? err.message : String(err)}`
-    spindle.log.warn(`providertlas (${runId}): ${detail}`)
-    emitStatus(rt.userId, rt.chatId, 'error', detail, record.state, undefined, origin)
+    spindle.log.warn(`LumiAtlas (${runId}): ${detail}`)
+    if (trigger === 'manual' || controller) {
+      emitStatus(rt.userId, rt.chatId, 'error', detail, fallbackState, undefined, origin)
+    }
   } finally {
     if (rt.timer) {
       clearTimeout(rt.timer)
       rt.timer = undefined
     }
-    if (rt.controller === controller) {
+    if (controller && rt.controller === controller) {
       rt.controller = undefined
       rt.busy = false
     }
@@ -681,12 +696,12 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
       return
     }
   } catch (err) {
-    spindle.log.error(`providertlas message handler error: ${err instanceof Error ? err.message : String(err)}`)
+    spindle.log.error(`LumiAtlas message handler error: ${err instanceof Error ? err.message : String(err)}`)
     emitStatus(
       userId,
       await getActiveChatId(userId),
       'error',
-      err instanceof Error ? err.message : 'Unexpected providertlas error.',
+      err instanceof Error ? err.message : 'Unexpected LumiAtlas error.',
       undefined,
       undefined,
       origin,
@@ -701,4 +716,4 @@ export const __testing = {
   defaultChatRecord,
 }
 
-spindle.log.info('providertlas backend loaded')
+spindle.log.info('LumiAtlas backend loaded')

@@ -499,7 +499,7 @@ export function setup(ctx: SpindleFrontendContext) {
 
   const tab = ctx.ui.registerDrawerTab({
     id: 'atlas',
-    title: 'providertlas',
+    title: 'LumiAtlas',
     shortName: 'Atlas',
     headerTitle: 'Atlas Map',
     description: '3-layer background cartographic map (Local, Region, World)',
@@ -535,7 +535,7 @@ export function setup(ctx: SpindleFrontendContext) {
   // Header
   const header = el('div', 'la-header')
   const titleGroup = el('div', 'la-title-group')
-  const locationEl = el('div', 'la-location', 'providertlas')
+  const locationEl = el('div', 'la-location', 'LumiAtlas')
   const subtitleEl = el('div', 'la-subtitle', 'Loading…')
   titleGroup.append(locationEl, subtitleEl)
 
@@ -681,7 +681,7 @@ export function setup(ctx: SpindleFrontendContext) {
       emptyOverlay.hidden = false
       emptyOverlay.replaceChildren(
         el('strong', undefined, 'Open a roleplay chat'),
-        el('span', undefined, 'providertlas tracks a separate 3-layer map per chat.'),
+        el('span', undefined, 'LumiAtlas tracks a separate 3-layer map per chat.'),
       )
       return
     }
@@ -1080,7 +1080,7 @@ export function setup(ctx: SpindleFrontendContext) {
     // Header
     locationEl.textContent = state.atlas?.currentLocation && state.atlas.currentLocation !== 'Unknown'
       ? state.atlas.currentLocation
-      : 'providertlas'
+      : 'LumiAtlas'
     subtitleEl.textContent = state.statusMessage
 
     const hasChat = !!state.activeChatId
