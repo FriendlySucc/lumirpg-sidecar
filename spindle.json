@@ -1,12 +1,12 @@
 {
-  "version": "0.1.4",
-  "name": "LumiRPG Sidecar",
+  "version": "0.2.0",
+  "name": "LumiAtlas",
   "identifier": "lumi_rpg_sidecar",
   "author": "Mousey",
-  "github": "https://github.com/FriendlySucc/lumi-rpg-sidecar",
-  "homepage": "https://github.com/FriendlySucc/lumi-rpg-sidecar",
-  "description": "Background Terra-powered map and Ledger companion for Lumiverse roleplay chats.",
-  "permissions": ["generation", "chat_mutation", "chats"],
+  "github": "https://github.com/FriendlySucc/lumirpg-sidecar",
+  "homepage": "https://github.com/FriendlySucc/lumirpg-sidecar",
+  "description": "Background 3-layer cartographic Atlas (Local, Region, World) with roads, region colors, physical scale, character pins, and zone initialization.",
+  "permissions": ["generation", "chats"],
   "entry_backend": "dist/backend.js",
   "entry_frontend": "dist/frontend.js",
   "minimum_lumiverse_version": "1.3.0"
