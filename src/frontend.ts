@@ -37,36 +37,11 @@ const STYLES = `
   line-height: 1.4;
 }
 .la-root * { box-sizing: border-box; }
-.la-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.la-title-group {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.la-location {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--lumiverse-text, #f5f6fb);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.la-subtitle {
-  font-size: 11px;
-  color: var(--lumiverse-text-muted, #9ea5bc);
-}
-.la-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
+.la-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.la-title-group { display: flex; flex-direction: column; min-width: 0; }
+.la-location { font-size: 15px; font-weight: 700; color: var(--lumiverse-text, #f5f6fb); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.la-subtitle { font-size: 11px; color: var(--lumiverse-text-muted, #9ea5bc); }
+.la-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .la-btn {
   appearance: none;
   border: 1px solid var(--lumiverse-border, #3e4359);
@@ -80,164 +55,79 @@ const STYLES = `
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
 }
-.la-btn:hover:not(:disabled) {
-  border-color: var(--lumiverse-primary, #9b8cff);
-  background: #2c3047;
-}
+.la-btn:hover:not(:disabled) { border-color: var(--lumiverse-primary, #9b8cff); background: #2c3047; }
 .la-btn:disabled { opacity: 0.48; cursor: not-allowed; }
 .la-btn[hidden] { display: none; }
-.la-btn-primary {
-  background: var(--lumiverse-primary, #7c6cf6);
-  border-color: var(--lumiverse-primary, #7c6cf6);
-  color: #ffffff;
-}
-.la-btn-primary:hover:not(:disabled) {
-  background: #8e7fff;
-  border-color: #8e7fff;
-}
-.la-btn-danger {
-  border-color: #c75b6b;
-  color: #ffb8c2;
-}
-.la-btn-icon {
-  padding: 5px 8px;
-  min-width: 28px;
-  text-align: center;
-}
-.la-btn-active {
-  border-color: var(--lumiverse-primary, #9b8cff);
-  background: rgba(124, 108, 246, 0.22);
-}
+.la-btn-primary { background: var(--lumiverse-primary, #7c6cf6); border-color: var(--lumiverse-primary, #7c6cf6); color: #fff; }
+.la-btn-primary:hover:not(:disabled) { background: #8e7fff; border-color: #8e7fff; }
+.la-btn-danger { border-color: #c75b6b; color: #ffb8c2; }
+.la-btn-icon { padding: 5px 8px; min-width: 28px; text-align: center; }
+.la-btn-active { border-color: var(--lumiverse-primary, #9b8cff); background: rgba(124,108,246,0.22); }
 
-.la-settings {
-  display: grid;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--lumiverse-border, #3e4359);
-  border-radius: 10px;
-  background: var(--lumiverse-fill-subtle, #1e2130);
-}
+.la-settings { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--lumiverse-border, #3e4359); border-radius: 10px; background: var(--lumiverse-fill-subtle, #1e2130); }
 .la-settings[hidden] { display: none; }
-.la-field {
+.la-field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; color: var(--lumiverse-text-muted, #aeb4c8); }
+.la-select { width: 100%; padding: 6px 8px; border-radius: 7px; border: 1px solid var(--lumiverse-border, #3e4359); background: #171926; color: var(--lumiverse-text, #eef0f7); font: inherit; font-size: 12px; }
+.la-toggles { display: flex; gap: 14px; flex-wrap: wrap; }
+.la-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--lumiverse-text, #eef0f7); }
+.la-check input { accent-color: var(--lumiverse-primary, #7c6cf6); width: 15px; height: 15px; margin: 0; }
+
+.la-banner { padding: 8px 10px; border-radius: 8px; font-size: 12px; border: 1px solid var(--lumiverse-border, #3e4359); background: #232638; }
+.la-banner[hidden] { display: none; }
+.la-banner-error { border-color: #c75b6b; background: rgba(199,91,107,0.14); color: #ffc8d0; }
+.la-banner-stale { border-color: #d9a441; background: rgba(217,164,65,0.14); color: #ffe3a8; }
+
+.la-thinking { border: 1px solid var(--lumiverse-border, #3e4359); border-radius: 10px; background: #191c2b; overflow: hidden; }
+.la-thinking[hidden] { display: none; }
+.la-thinking-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; background: rgba(124,108,246,0.12); border-bottom: 1px solid rgba(255,255,255,0.06); cursor: pointer; user-select: none; }
+.la-thinking-title { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: #dcd6ff; }
+.la-thinking-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lumiverse-primary, #9b8cff); flex: none; }
+.la-thinking-dot.la-pulse { animation: la-pulse-anim 1.2s ease-in-out infinite; }
+@keyframes la-pulse-anim { 0%,100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
+.la-thinking-meta { font-size: 11px; color: var(--lumiverse-text-muted, #9ea5bc); }
+.la-thinking-body { margin: 0; padding: 8px 10px; max-height: 150px; overflow-y: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: #c5cbe3; background: #141724; }
+.la-thinking-body[hidden] { display: none; }
+
+/* ── Three-section browser ── */
+.la-browser {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+.la-section {
+  border: 1px solid var(--lumiverse-border, #3e4359);
+  border-radius: 12px;
+  background: var(--lumiverse-fill-subtle, #1e2130);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--lumiverse-text-muted, #aeb4c8);
+  min-width: 0;
 }
-.la-select {
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: 7px;
-  border: 1px solid var(--lumiverse-border, #3e4359);
-  background: #171926;
-  color: var(--lumiverse-text, #eef0f7);
-  font: inherit;
-  font-size: 12px;
-}
-.la-toggles {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-.la-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  color: var(--lumiverse-text, #eef0f7);
-}
-.la-check input {
-  accent-color: var(--lumiverse-primary, #7c6cf6);
-  width: 15px;
-  height: 15px;
-  margin: 0;
-}
-
-.la-banner {
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  border: 1px solid var(--lumiverse-border, #3e4359);
-  background: #232638;
-}
-.la-banner[hidden] { display: none; }
-.la-banner-error {
-  border-color: #c75b6b;
-  background: rgba(199, 91, 107, 0.14);
-  color: #ffc8d0;
-}
-.la-banner-stale {
-  border-color: #d9a441;
-  background: rgba(217, 164, 65, 0.14);
-  color: #ffe3a8;
-}
-
-.la-toolbar {
+.la-section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(124,108,246,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.la-browser-nav {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
-  gap: 8px;
-  min-width: 0;
-}
-.la-browser-nav .la-field { min-width: 0; }
-.la-browser-nav .la-field:last-child { grid-column: 1 / -1; }
-.la-browser-nav select:disabled { opacity: 0.55; }
-.la-browser-nav select { min-height: 40px; }
-@media (min-width: 500px) {
-  .la-browser-nav .la-field:last-child { grid-column: auto; }
-}
-.la-toolbar[hidden], .la-canvas-wrap[hidden], .la-inspector[hidden] { display: none; }
-.la-state-panel {
-  border: 1px solid var(--lumiverse-border, #3e4359);
-  border-radius: 10px;
-  background: var(--lumiverse-fill-subtle, #1e2130);
-  padding: 10px 12px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.la-state-panel[hidden] { display: none; }
-.la-state-section + .la-state-section {
-  border-top: 1px solid rgba(255,255,255,0.08);
-  margin-top: 10px;
-  padding-top: 10px;
-}
-.la-state-text {
-  margin: 5px 0 0;
-  font: inherit;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--lumiverse-text, #dce0f0);
-}
-.la-layer-tools {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-.la-floors {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-}
+.la-section-title { font-size: 12px; font-weight: 700; color: #dcd6ff; display: flex; align-items: center; gap: 6px; }
+.la-section-icon { font-size: 14px; }
+.la-section-body { padding: 8px 10px; flex: 1; min-height: 0; overflow-y: auto; }
 
+/* Map section */
+.la-map-section .la-section-body { padding: 0; }
+.la-map-controls { display: flex; gap: 6px; padding: 8px 10px; flex-wrap: wrap; align-items: center; }
+.la-map-controls .la-field { flex: 1; min-width: 100px; }
 .la-canvas-wrap {
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
-  min-height: 260px;
-  max-height: 520px;
-  border: 1px solid var(--lumiverse-border, #434861);
-  border-radius: 12px;
+  min-height: 200px;
+  max-height: 400px;
+  border-top: 1px solid var(--lumiverse-border, #434861);
   overflow: hidden;
   background: radial-gradient(circle at 50% 45%, #1d2233 0%, #131622 100%);
   touch-action: none;
@@ -245,300 +135,91 @@ const STYLES = `
 }
 .la-canvas-wrap.la-dragging { cursor: grabbing; }
 .la-canvas-wrap:not(.la-dragging) { cursor: grab; }
-.la-svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+.la-svg { width: 100%; height: 100%; display: block; }
 .la-empty-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 20px;
-  text-align: center;
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 20px; text-align: center;
   color: var(--lumiverse-text-muted, #aeb4c8);
-  background: rgba(19, 22, 34, 0.72);
+  background: rgba(19,22,34,0.72);
   pointer-events: none;
 }
 .la-empty-overlay[hidden] { display: none; }
-.la-empty-overlay strong {
-  color: var(--lumiverse-text, #eef0f7);
-  font-size: 14px;
-}
-.la-thinking {
-  border: 1px solid var(--lumiverse-border, #3e4359);
-  border-radius: 10px;
-  background: #191c2b;
-  overflow: hidden;
-}
-.la-thinking[hidden] { display: none; }
-.la-thinking-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  background: rgba(124, 108, 246, 0.12);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  cursor: pointer;
-  user-select: none;
-}
-.la-thinking-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #dcd6ff;
-}
-.la-thinking-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--lumiverse-primary, #9b8cff);
-  flex: none;
-}
-.la-thinking-dot.la-pulse {
-  animation: la-pulse-anim 1.2s ease-in-out infinite;
-}
-@keyframes la-pulse-anim {
-  0%, 100% { opacity: 0.35; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1.15); }
-}
-.la-thinking-meta {
-  font-size: 11px;
-  color: var(--lumiverse-text-muted, #9ea5bc);
-}
-.la-thinking-body {
-  margin: 0;
-  padding: 8px 10px;
-  max-height: 150px;
-  overflow-y: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: #c5cbe3;
-  background: #141724;
-}
-.la-thinking-body[hidden] { display: none; }
-.la-hud-corner {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  display: flex;
-  gap: 4px;
-  z-index: 2;
-}
-.la-hud-badge {
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  background: rgba(18, 20, 30, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #dbe0f2;
-  pointer-events: none;
-}
+.la-empty-overlay strong { color: var(--lumiverse-text, #eef0f7); font-size: 14px; }
+.la-hud-corner { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; z-index: 2; }
+.la-hud-badge { position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(18,20,30,0.82); border: 1px solid rgba(255,255,255,0.12); color: #dbe0f2; pointer-events: none; }
 
 .la-tile-group { cursor: pointer; }
-.la-tile-rect {
-  transition: filter 120ms ease, stroke-width 120ms ease;
-}
-.la-tile-group:hover .la-tile-rect {
-  filter: brightness(1.16);
-}
-.la-tile-selected .la-tile-rect {
-  stroke: #ffffff !important;
-  stroke-width: 0.75 !important;
-}
-.la-tile-current .la-tile-rect {
-  stroke: #fde047 !important;
-  stroke-width: 0.7 !important;
-}
-.la-tile-label {
-  fill: #f7f8fc;
-  font-weight: 700;
-  pointer-events: none;
-  paint-order: stroke;
-  stroke: rgba(14, 16, 25, 0.85);
-  stroke-width: 0.55;
-  stroke-linejoin: round;
-}
-.la-tile-size {
-  fill: #dbe2ff;
-  font-weight: 600;
-  opacity: 0.88;
-  pointer-events: none;
-  paint-order: stroke;
-  stroke: rgba(14, 16, 25, 0.85);
-  stroke-width: 0.45;
-}
-.la-pin-label {
-  fill: #ffffff;
-  font-weight: 700;
-  pointer-events: none;
-  paint-order: stroke;
-  stroke: rgba(11, 13, 20, 0.95);
-  stroke-width: 0.65;
-  stroke-linejoin: round;
-}
+.la-tile-rect { transition: filter 120ms ease, stroke-width 120ms ease; }
+.la-tile-group:hover .la-tile-rect { filter: brightness(1.16); }
+.la-tile-selected .la-tile-rect { stroke: #fff !important; stroke-width: 0.75 !important; }
+.la-tile-current .la-tile-rect { stroke: #fde047 !important; stroke-width: 0.7 !important; }
+.la-tile-label { fill: #f7f8fc; font-weight: 700; pointer-events: none; paint-order: stroke; stroke: rgba(14,16,25,0.85); stroke-width: 0.55; stroke-linejoin: round; }
+.la-tile-size { fill: #dbe2ff; font-weight: 600; opacity: 0.88; pointer-events: none; paint-order: stroke; stroke: rgba(14,16,25,0.85); stroke-width: 0.45; }
+.la-pin-label { fill: #fff; font-weight: 700; pointer-events: none; paint-order: stroke; stroke: rgba(11,13,20,0.95); stroke-width: 0.65; stroke-linejoin: round; }
 
-.la-inspector {
-  border: 1px solid var(--lumiverse-border, #3e4359);
-  border-radius: 10px;
-  background: var(--lumiverse-fill-subtle, #1e2130);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.la-insp-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.la-insp-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--lumiverse-text, #f5f6fb);
-}
-.la-pill-row {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-.la-pill {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #2b2f45;
-  color: #cbd2eb;
+.la-map-toolbar { display: flex; align-items: center; gap: 5px; padding: 6px 10px; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,0.06); }
+.la-floors { display: inline-flex; gap: 4px; align-items: center; }
+
+.la-inspector { padding: 8px 10px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 6px; }
+.la-insp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.la-insp-title { font-size: 14px; font-weight: 700; color: var(--lumiverse-text, #f5f6fb); }
+.la-pill-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.la-pill { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 999px; background: #2b2f45; color: #cbd2eb; border: 1px solid rgba(255,255,255,0.08); }
+.la-pill-current { background: rgba(250,204,21,0.18); color: #fde68a; border-color: rgba(250,204,21,0.4); }
+.la-pill-locked { background: rgba(244,114,182,0.16); color: #fbcfe8; border-color: rgba(244,114,182,0.35); }
+.la-insp-summary { margin: 0; font-size: 12px; color: var(--lumiverse-text, #dce0f0); }
+.la-insp-section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--lumiverse-text-muted, #98a0b8); }
+.la-feature-list { margin: 0; padding-left: 16px; display: grid; gap: 2px; font-size: 12px; color: #d0d6ec; }
+.la-chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.la-pin-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; background: #262a3d; border: 1px solid rgba(255,255,255,0.1); font-size: 11px; color: #eef0f7; }
+.la-pin-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.la-neighbor-btn { appearance: none; border: 1px solid var(--lumiverse-border, #434861); background: #262a3d; color: #d6dcf5; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 11px; cursor: pointer; }
+.la-neighbor-btn:hover { border-color: var(--lumiverse-primary, #9b8cff); color: #fff; }
+.la-notes { font-size: 11px; color: var(--lumiverse-text-muted, #9ca3bb); border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px; }
+
+/* ── State cards ── */
+.la-state-group { margin-bottom: 10px; }
+.la-state-group:last-child { margin-bottom: 0; }
+.la-state-group-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--lumiverse-text-muted, #98a0b8); margin-bottom: 6px; }
+.la-state-cards { display: grid; gap: 6px; }
+.la-state-card {
   border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.03);
 }
-.la-pill-current { background: rgba(250, 204, 21, 0.18); color: #fde68a; border-color: rgba(250, 204, 21, 0.4); }
-.la-pill-locked { background: rgba(244, 114, 182, 0.16); color: #fbcfe8; border-color: rgba(244, 114, 182, 0.35); }
-.la-insp-summary {
-  margin: 0;
-  font-size: 12px;
-  color: var(--lumiverse-text, #dce0f0);
-}
-.la-insp-section-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--lumiverse-text-muted, #98a0b8);
-}
-.la-feature-list {
-  margin: 0;
-  padding-left: 16px;
-  display: grid;
-  gap: 2px;
-  font-size: 12px;
-  color: #d0d6ec;
-}
-.la-chip-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.la-pin-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #262a3d;
-  border: 1px solid rgba(255,255,255,0.1);
-  font-size: 11px;
-  color: #eef0f7;
-}
-.la-pin-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: none;
-}
-.la-neighbor-btn {
-  appearance: none;
-  border: 1px solid var(--lumiverse-border, #434861);
-  background: #262a3d;
-  color: #d6dcf5;
-  border-radius: 6px;
-  padding: 3px 8px;
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-}
-.la-neighbor-btn:hover {
-  border-color: var(--lumiverse-primary, #9b8cff);
-  color: #fff;
-}
-.la-notes {
-  font-size: 11px;
-  color: var(--lumiverse-text-muted, #9ca3bb);
-  border-top: 1px solid rgba(255,255,255,0.08);
-  padding-top: 6px;
-}
+.la-state-card-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.la-state-card-name { font-weight: 700; font-size: 12px; color: #e8eaf4; }
+.la-state-card-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: rgba(124,108,246,0.18); color: #c4b5fd; }
+.la-state-card-body { font-size: 12px; color: #c5cbe3; white-space: pre-wrap; overflow-wrap: anywhere; }
+.la-state-field { display: flex; gap: 6px; margin-bottom: 2px; }
+.la-state-field-label { font-weight: 600; color: #9ea5bc; min-width: 70px; flex: none; }
+.la-state-field-value { color: #dce0f0; }
+
+/* ── Ledger panel ── */
+.la-ledger-body { padding: 8px 10px; }
+.la-ledger-empty { color: var(--lumiverse-text-muted, #9ea5bc); font-size: 12px; text-align: center; padding: 12px; }
+.la-ledger-content { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; color: #dce0f0; }
 `
 
-interface Camera {
-  x: number
-  y: number
-  w: number
-  h: number
-}
+interface Camera { x: number; y: number; w: number; h: number }
+interface StreamPreview { phase: 'thinking' | 'writing'; reasoning: string; outputChars: number; outputTail: string }
 
-interface StreamPreview {
-  phase: 'thinking' | 'writing'
-  reasoning: string
-  outputChars: number
-  outputTail: string
-}
-
-const STATE_VIEWS = [
-  ['map', 'Map'],
-  ['world-scene', 'World & Scene'],
-  ['onscreen-thoughts', 'Onscreen & Thoughts'],
-  ['offscreen-agendas', 'Offscreen Agendas'],
-  ['profiles-memories', 'Profiles & Memories'],
-  ['relationships-reputation', 'Relationships & Reputation'],
-  ['plot-leads', 'Plot & Leads'],
-  ['inventory-notes', 'Inventory & Notes'],
-  ['ledger', 'Ledger'],
+const STATE_GROUPS = [
+  { id: 'world-scene', label: 'World & Scene', icon: '🌍', sections: [['world', 'World'], ['locations', 'Locations']] },
+  { id: 'onscreen-thoughts', label: 'Onscreen & Thoughts', icon: '👁', sections: [['onscreen', 'Onscreen'], ['thoughts', 'Thoughts']] },
+  { id: 'offscreen-agendas', label: 'Offscreen Agendas', icon: '🌙', sections: [['offscreen_agendas', 'Offscreen Agendas']] },
+  { id: 'profiles-memories', label: 'Profiles & Memories', icon: '📋', sections: [['entity_state', 'Profiles'], ['entityMem', 'Memories']] },
+  { id: 'relationships-reputation', label: 'Relationships & Reputation', icon: '💞', sections: [['dam', 'Dynamics'], ['pair', 'Relationships'], ['reputation', 'Reputation']] },
+  { id: 'plot-leads', label: 'Plot & Leads', icon: '🧵', sections: [['tracks', 'Tracks'], ['arc', 'Arc'], ['chekhov', 'Story Threads'], ['leads', 'Leads']] },
+  { id: 'inventory-notes', label: 'Inventory & Notes', icon: '🎒', sections: [['inv', 'Inventory'], ['story_notes', 'Story Notes'], ['notebook', 'Notebook'], ['vent', 'Vent']] },
 ] as const
-type StateView = (typeof STATE_VIEWS)[number][0]
 
-const STATE_GROUPS: Record<Exclude<StateView, 'map' | 'ledger'>, ReadonlyArray<readonly [string, string]>> = {
-  'world-scene': [['world', 'World'], ['locations', 'Locations']],
-  'onscreen-thoughts': [['onscreen', 'Onscreen'], ['thoughts', 'Thoughts']],
-  'offscreen-agendas': [['offscreen_agendas', 'Offscreen agendas']],
-  'profiles-memories': [['entity_state', 'Profiles'], ['entityMem', 'Memories']],
-  'relationships-reputation': [['dam', 'Dynamics'], ['pair', 'Relationships'], ['reputation', 'Reputation']],
-  'plot-leads': [['tracks', 'Tracks'], ['arc', 'Arc'], ['chekhov', 'Story threads'], ['leads', 'Player-facing leads']],
-  'inventory-notes': [['inv', 'Inventory'], ['story_notes', 'Story notes'], ['notebook', 'Notebook'], ['vent', 'Vent']],
-}
+type StateGroupId = (typeof STATE_GROUPS)[number]['id']
 
-interface InternalSnapshot {
-  sections: Record<string, string>
-  ledger?: string
-}
+interface InternalSnapshot { sections: Record<string, string>; ledger?: string }
 
-// The optional payload is not yet in the shared message types. Never trust it at runtime.
 function readInternalSnapshot(raw: unknown): InternalSnapshot | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
   const value = raw as { sections?: unknown; ledger?: unknown }
@@ -553,7 +234,6 @@ function readInternalSnapshot(raw: unknown): InternalSnapshot | null {
 const LEDGER_MARKUP = /(?:<|&lt;)\s*\/?\s*(?:(?:[\w.-]+:)?(?:details|ledger|activation)|ledger:[\w.-]+)\b|ldg-source/i
 const LEDGER_ELEMENT = /^(?:(?:[\w.-]+:)?(?:details|ledger|activation)|ledger:[\w.-]+)$/i
 
-// Parse only inert XML, then create our own text output. Malformed data stays literal text.
 function formatStateText(raw: string, omitLedger = false): string {
   const input = raw.trim()
   if (!input || /<!\s*(?:DOCTYPE|ENTITY)/i.test(input)) return input
@@ -593,7 +273,6 @@ function formatStateText(raw: string, omitLedger = false): string {
   }
 }
 
-// Fail closed on malformed XML, conflicting activation fields and unscoped data.
 function revealedLedger(raw: string | undefined): string | null {
   if (!raw?.trim() || /<!\s*(?:DOCTYPE|ENTITY)/i.test(raw)) return null
   try {
@@ -612,6 +291,74 @@ function revealedLedger(raw: string | undefined): string | null {
   }
 }
 
+/* ── Parse state sections into structured cards ── */
+interface StateCard {
+  name: string
+  badge?: string
+  fields: Array<{ label: string; value: string }>
+  rawText: string
+}
+
+function parseStateSection(raw: string): StateCard[] {
+  const input = raw.trim()
+  if (!input) return []
+  try {
+    const parser = new window.DOMParser()
+    const parsed = parser.parseFromString(`<root xmlns:state="urn:lumi-atlas:state">${input}</root>`, 'application/xml')
+    if (parsed.querySelector('parsererror')) return [{ name: 'Raw', fields: [], rawText: input }]
+    const cards: StateCard[] = []
+    const root = parsed.documentElement
+    const stateEl = Array.from(root.children).find(el => el.tagName.startsWith('state:') && !LEDGER_ELEMENT.test(el.tagName))
+    if (!stateEl) {
+      // If the entire state section is a ledger element, return empty
+      const anyState = Array.from(root.children).find(el => el.tagName.startsWith('state:'))
+      if (anyState && LEDGER_ELEMENT.test(anyState.tagName)) return []
+      return [{ name: 'Raw', fields: [], rawText: input }]
+    }
+
+    const records = Array.from(stateEl.children).filter(el => !LEDGER_ELEMENT.test(el.tagName))
+    if (!records.length) {
+      // Extract text excluding ledger elements
+      const clone = stateEl.cloneNode(true) as Element
+      for (const el of Array.from(clone.querySelectorAll('*'))) {
+        if (LEDGER_ELEMENT.test(el.tagName)) el.remove()
+      }
+      const text = clone.textContent?.trim()
+      return text ? [{ name: stateEl.tagName.replace(/^state:/, ''), fields: [], rawText: text }] : []
+    }
+
+    for (const record of records) {
+      const fields: StateCard['fields'] = []
+      let name = record.tagName.replace(/_/g, ' ')
+      let badge: string | undefined
+
+      for (const child of Array.from(record.children)) {
+        if (LEDGER_ELEMENT.test(child.tagName)) continue
+        const label = child.tagName.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2')
+        const value = child.textContent?.trim() ?? ''
+        if (child.tagName === 'name' || child.tagName === 'names' || child.tagName === 'pair') {
+          name = value
+        } else if (child.tagName === 'mode' || child.tagName === 'standing' || child.tagName === 'status') {
+          badge = value
+          fields.push({ label, value })
+        } else {
+          fields.push({ label, value })
+        }
+      }
+
+      if (name === record.tagName.replace(/_/g, ' ') && !record.children.length) {
+        name = record.textContent?.trim()?.slice(0, 40) ?? name
+      }
+
+      cards.push({ name, badge, fields, rawText: '' })
+    }
+
+    return cards.length ? cards : [{ name: 'Data', fields: [], rawText: formatStateText(input) }]
+  } catch {
+    return [{ name: 'Raw', fields: [], rawText: input }]
+  }
+}
+
 interface AppState {
   activeChatId: string | null
   config: EffectiveConfig
@@ -623,7 +370,7 @@ interface AppState {
   archives: Record<Scale, MapLayer[]>
   selectedLayerId: Record<Scale, string | null>
   scale: Scale
-  view: StateView
+  stateGroup: StateGroupId
   floor: number
   selectedTileId: string | null
   busy: boolean
@@ -640,34 +387,21 @@ interface AppState {
   destroyed: boolean
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className?: string,
-  text?: string,
-): HTMLElementTagNameMap[K] {
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag)
   if (className) node.className = className
   if (text !== undefined) node.textContent = text
   return node
 }
 
-function svgEl<K extends keyof SVGElementTagNameMap>(
-  tag: K,
-  attrs?: Record<string, string | number>,
-): SVGElementTagNameMap[K] {
+function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs?: Record<string, string | number>): SVGElementTagNameMap[K] {
   const node = document.createElementNS(SVG_NS, tag)
-  if (attrs) {
-    for (const [k, v] of Object.entries(attrs)) {
-      node.setAttribute(k, String(v))
-    }
-  }
+  if (attrs) for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v))
   return node
 }
 
 function makeRequestId(ctx: SpindleFrontendContext, fallbackCounter: number): string {
-  if (ctx.uuid && (ctx.host.capabilities['frontend-uuid-v1'] ?? 0) >= 1) {
-    return ctx.uuid.v4()
-  }
+  if (ctx.uuid && (ctx.host.capabilities['frontend-uuid-v1'] ?? 0) >= 1) return ctx.uuid.v4()
   return `la_req_${Date.now()}_${fallbackCounter}`
 }
 
@@ -689,43 +423,27 @@ function wrapTextLines(raw: string, maxCharsPerLine: number, maxLines: number): 
   const words = text.split(/\s+/)
   const lines: string[] = []
   let current = ''
-
   for (const word of words) {
     if (!current) {
-      if (word.length <= limit) {
-        current = word
-      } else {
-        lines.push(`${word.slice(0, Math.max(3, limit - 1))}…`)
-      }
+      if (word.length <= limit) current = word
+      else lines.push(`${word.slice(0, Math.max(3, limit - 1))}…`)
     } else if (current.length + 1 + word.length <= limit) {
       current = `${current} ${word}`
     } else {
       lines.push(current)
-      if (word.length <= limit) {
-        current = word
-      } else {
-        current = `${word.slice(0, Math.max(3, limit - 1))}…`
-      }
+      if (word.length <= limit) current = word
+      else current = `${word.slice(0, Math.max(3, limit - 1))}…`
     }
     if (lines.length >= maxLines) break
   }
-
-  if (lines.length < maxLines && current) {
-    lines.push(current)
-  }
-
-  // If we truncated words, ensure last line ends with ellipsis
+  if (lines.length < maxLines && current) lines.push(current)
   const consumed = lines.join(' ').replace(/…/g, '')
   if (lines.length === maxLines && consumed.length < text.length) {
     const last = lines[maxLines - 1]
     if (!last.endsWith('…')) {
-      lines[maxLines - 1] =
-        last.length >= limit
-          ? `${last.slice(0, Math.max(3, limit - 1))}…`
-          : `${last}…`
+      lines[maxLines - 1] = last.length >= limit ? `${last.slice(0, Math.max(3, limit - 1))}…` : `${last}…`
     }
   }
-
   return lines.slice(0, maxLines)
 }
 
@@ -737,28 +455,18 @@ function shortPinLabel(name: string, maxChars: number): string {
   return `${first.slice(0, Math.max(3, maxChars - 1))}…`
 }
 
-interface PinPlacement {
-  pin: Tile['pins'][number]
-  px: number
-  py: number
-  row: number
-  colsInRow: number
-}
+interface PinPlacement { pin: Tile['pins'][number]; px: number; py: number; row: number; colsInRow: number }
 
-/** Arrange pins cleanly in the tile's dedicated lower pin zone so they never cover labels or stack. */
 function layoutTilePins(tile: Tile): PinPlacement[] {
   const pins = tile.pins
   if (!pins.length) return []
-  // Sort player first or preserve left-to-right hint from pin.x
   const ordered = [...pins].sort((a, b) => a.x - b.x)
   const maxPerRow = tile.w >= 25 ? 4 : tile.w >= 15 ? 3 : tile.w >= 10 ? 2 : 1
   const rows = Math.ceil(ordered.length / maxPerRow)
   const placements: PinPlacement[] = []
-
   const bandTop = tile.y + tile.h * (rows > 1 ? 0.56 : 0.64)
   const bandBottom = tile.y + tile.h * 0.79
   const bandHeight = Math.max(1.2, bandBottom - bandTop)
-
   for (let i = 0; i < ordered.length; i++) {
     const row = Math.floor(i / maxPerRow)
     const col = i % maxPerRow
@@ -783,8 +491,8 @@ export function setup(ctx: SpindleFrontendContext) {
     title: 'LumiAtlas',
     shortName: 'Atlas',
     headerTitle: 'Atlas Map',
-    description: '3-layer background cartographic map (Local, Region, World)',
-    keywords: ['map', 'atlas', 'world', 'region', 'local', 'pins'],
+    description: 'Background simulation: states, map, and ledger',
+    keywords: ['map', 'atlas', 'world', 'region', 'local', 'pins', 'states', 'simulation'],
     iconSvg: ATLAS_ICON_SVG,
   })
 
@@ -801,7 +509,7 @@ export function setup(ctx: SpindleFrontendContext) {
     archives: { local: [], region: [], world: [] },
     selectedLayerId: { local: null, region: null, world: null },
     scale: 'local',
-    view: 'map',
+    stateGroup: 'world-scene',
     floor: 0,
     selectedTileId: null,
     busy: false,
@@ -818,7 +526,7 @@ export function setup(ctx: SpindleFrontendContext) {
     destroyed: false,
   }
 
-  // Build static DOM skeleton
+  // ── Build DOM ──
   const root = el('div', 'la-root')
 
   // Header
@@ -827,7 +535,6 @@ export function setup(ctx: SpindleFrontendContext) {
   const locationEl = el('div', 'la-location', 'LumiAtlas')
   const subtitleEl = el('div', 'la-subtitle', 'Loading…')
   titleGroup.append(locationEl, subtitleEl)
-
   const actions = el('div', 'la-actions')
   const analyzeBtn = el('button', 'la-btn la-btn-primary', 'Analyze')
   const rebuildBtn = el('button', 'la-btn', 'Rebuild')
@@ -837,30 +544,25 @@ export function setup(ctx: SpindleFrontendContext) {
   actions.append(analyzeBtn, rebuildBtn, cancelBtn, settingsBtn)
   header.append(titleGroup, actions)
 
-  // Settings panel
+  // Settings
   const settingsBox = el('div', 'la-settings')
   settingsBox.hidden = true
-
-  const connField = el('label', 'la-field', 'Background Map Model (Connection)')
+  const connField = el('label', 'la-field', 'Background Model (Connection)')
   const connSelect = el('select', 'la-select')
   connField.append(connSelect)
-
   const toggles = el('div', 'la-toggles')
   const enabledLabel = el('label', 'la-check')
   const enabledInput = el('input')
   enabledInput.type = 'checkbox'
   enabledLabel.append(enabledInput, document.createTextNode('Enable for this chat'))
-
   const autoLabel = el('label', 'la-check')
   const autoInput = el('input')
   autoInput.type = 'checkbox'
   autoLabel.append(autoInput, document.createTextNode('Auto-update after replies'))
-
   const reasoningLabel = el('label', 'la-check')
   const reasoningInput = el('input')
   reasoningInput.type = 'checkbox'
   reasoningLabel.append(reasoningInput, document.createTextNode('Show model thinking'))
-
   const refreshBtn = el('button', 'la-btn', 'Reload')
   toggles.append(enabledLabel, autoLabel, reasoningLabel, refreshBtn)
   settingsBox.append(connField, toggles)
@@ -871,7 +573,7 @@ export function setup(ctx: SpindleFrontendContext) {
   const staleBanner = el('div', 'la-banner la-banner-stale')
   staleBanner.hidden = true
 
-  // Live thinking / generation stream panel
+  // Thinking panel
   const thinkingBox = el('div', 'la-thinking')
   thinkingBox.hidden = true
   const thinkingHead = el('div', 'la-thinking-head')
@@ -884,49 +586,36 @@ export function setup(ctx: SpindleFrontendContext) {
   const thinkingBody = el('pre', 'la-thinking-body', '')
   thinkingBox.append(thinkingHead, thinkingBody)
 
-  // State browser: map controls retain their selection while another view is open.
-  const browserNav = el('div', 'la-browser-nav')
-  const viewField = el('label', 'la-field', 'States view')
-  const viewSelect = el('select', 'la-select')
-  viewSelect.setAttribute('aria-label', 'States view')
-  for (const [value, label] of STATE_VIEWS) {
-    const option = el('option', undefined, label)
-    option.value = value
-    viewSelect.append(option)
-  }
-  viewField.append(viewSelect)
-  const scaleField = el('label', 'la-field', 'Map scale')
+  // ═══════════════════════════════════════════════════════
+  // THREE SEPARATE SECTIONS: Map | States | Ledger
+  // ═══════════════════════════════════════════════════════
+  const browser = el('div', 'la-browser')
+
+  // ── Section 1: MAP ──
+  const mapSection = el('div', 'la-section la-map-section')
+  const mapHead = el('div', 'la-section-head')
+  const mapTitle = el('div', 'la-section-title')
+  mapTitle.append(el('span', 'la-section-icon', '🗺'), el('span', undefined, 'Map'))
+  mapHead.append(mapTitle)
+
+  const mapControls = el('div', 'la-map-controls')
+  const scaleField = el('label', 'la-field', 'Scale')
   const scaleSelect = el('select', 'la-select')
   scaleSelect.setAttribute('aria-label', 'Map scale')
   for (const [value, label] of [['local', 'Local'], ['region', 'Region'], ['world', 'World']] as const) {
-    const option = el('option', undefined, label)
-    option.value = value
-    scaleSelect.append(option)
+    const opt = el('option', undefined, label)
+    opt.value = value
+    scaleSelect.append(opt)
   }
   scaleField.append(scaleSelect)
-  const layerField = el('label', 'la-field', 'Zone map')
-  const layerSelect = el('select', 'la-select la-layer-select')
-  layerSelect.setAttribute('aria-label', 'Zone map')
-  layerField.append(layerSelect)
-  browserNav.append(viewField, scaleField, layerField)
+  const zoneField = el('label', 'la-field', 'Zone')
+  const zoneSelect = el('select', 'la-select')
+  zoneSelect.setAttribute('aria-label', 'Zone map')
+  zoneField.append(zoneSelect)
+  mapControls.append(scaleField, zoneField)
 
-  // Map tools
-  const toolbar = el('div', 'la-toolbar')
-  const layerTools = el('div', 'la-layer-tools')
-  const floorBar = el('div', 'la-floors')
-  const pinsToggle = el('button', 'la-btn la-btn-active', 'Pins')
-  const roadsToggle = el('button', 'la-btn la-btn-active', 'Roads')
-  const labelsToggle = el('button', 'la-btn la-btn-active', 'Labels')
-  layerTools.append(floorBar, pinsToggle, roadsToggle, labelsToggle)
-  toolbar.append(layerTools)
-
-  // Map canvas
   const canvasWrap = el('div', 'la-canvas-wrap')
-  const svg = svgEl('svg', {
-    class: 'la-svg',
-    viewBox: '-50 -50 100 100',
-    preserveAspectRatio: 'xMidYMid meet',
-  })
+  const svg = svgEl('svg', { class: 'la-svg', viewBox: '-50 -50 100 100', preserveAspectRatio: 'xMidYMid meet' })
   const hudBadge = el('div', 'la-hud-badge', 'Local')
   const hudCorner = el('div', 'la-hud-corner')
   const zoomInBtn = el('button', 'la-btn la-btn-icon', '+')
@@ -936,19 +625,59 @@ export function setup(ctx: SpindleFrontendContext) {
   const fitBtn = el('button', 'la-btn la-btn-icon', 'Fit')
   fitBtn.title = 'Fit map to view'
   hudCorner.append(zoomOutBtn, zoomInBtn, fitBtn)
-
   const emptyOverlay = el('div', 'la-empty-overlay')
   canvasWrap.append(svg, hudBadge, hudCorner, emptyOverlay)
 
-  // Inspector
-  const inspector = el('div', 'la-inspector')
-  const statePanel = el('section', 'la-state-panel')
-  statePanel.setAttribute('aria-live', 'polite')
-  statePanel.hidden = true
+  const mapToolbar = el('div', 'la-map-toolbar')
+  const floorBar = el('div', 'la-floors')
+  const pinsToggle = el('button', 'la-btn la-btn-active', 'Pins')
+  const roadsToggle = el('button', 'la-btn la-btn-active', 'Roads')
+  const labelsToggle = el('button', 'la-btn la-btn-active', 'Labels')
+  mapToolbar.append(floorBar, pinsToggle, roadsToggle, labelsToggle)
 
-  root.append(header, settingsBox, errorBanner, staleBanner, thinkingBox, browserNav, toolbar, canvasWrap, inspector, statePanel)
+  const inspector = el('div', 'la-inspector')
+
+  const mapBody = el('div', 'la-section-body')
+  mapBody.append(mapControls, canvasWrap, mapToolbar, inspector)
+  mapSection.append(mapHead, mapBody)
+
+  // ── Section 2: STATES ──
+  const statesSection = el('div', 'la-section')
+  const statesHead = el('div', 'la-section-head')
+  const statesTitle = el('div', 'la-section-title')
+  statesTitle.append(el('span', 'la-section-icon', '📊'), el('span', undefined, 'States'))
+  statesHead.append(statesTitle)
+
+  const stateGroupField = el('label', 'la-field', 'Category')
+  const stateGroupSelect = el('select', 'la-select')
+  stateGroupSelect.setAttribute('aria-label', 'State category')
+  for (const group of STATE_GROUPS) {
+    const opt = el('option', undefined, `${group.icon} ${group.label}`)
+    opt.value = group.id
+    stateGroupSelect.append(opt)
+  }
+  stateGroupField.append(stateGroupSelect)
+
+  const statesBody = el('div', 'la-section-body')
+  const statesContent = el('div', 'la-state-cards')
+  statesBody.append(stateGroupField, statesContent)
+  statesSection.append(statesHead, statesBody)
+
+  // ── Section 3: LEDGER ──
+  const ledgerSection = el('div', 'la-section')
+  const ledgerHead = el('div', 'la-section-head')
+  const ledgerTitle = el('div', 'la-section-title')
+  ledgerTitle.append(el('span', 'la-section-icon', '📒'), el('span', undefined, 'Ledger'))
+  ledgerHead.append(ledgerTitle)
+
+  const ledgerBody = el('div', 'la-section-body la-ledger-body')
+  ledgerSection.append(ledgerHead, ledgerBody)
+
+  browser.append(mapSection, statesSection, ledgerSection)
+  root.append(header, settingsBox, errorBanner, staleBanner, thinkingBox, browser)
   tab.root.replaceChildren(root)
 
+  // ── Helpers ──
   function send(msg: FrontendToBackendMessage): void {
     if (state.destroyed) return
     ctx.sendToBackend(msg)
@@ -966,15 +695,9 @@ export function setup(ctx: SpindleFrontendContext) {
     const result: MapLayer[] = []
     const seen = new Set<string>()
     const active = state.atlas?.maps?.[scale]
-    if (active && active.tiles.length > 0) {
-      result.push(active)
-      seen.add(active.id)
-    }
+    if (active && active.tiles.length > 0) { result.push(active); seen.add(active.id) }
     for (const archived of state.archives[scale] ?? []) {
-      if (archived && archived.tiles.length > 0 && !seen.has(archived.id)) {
-        result.push(archived)
-        seen.add(archived.id)
-      }
+      if (archived && archived.tiles.length > 0 && !seen.has(archived.id)) { result.push(archived); seen.add(archived.id) }
     }
     return result
   }
@@ -990,8 +713,7 @@ export function setup(ctx: SpindleFrontendContext) {
     const active = state.atlas?.maps?.[state.scale] ?? null
     const pickedId = state.selectedLayerId[state.scale]
     if (pickedId) {
-      const list = availableLayers(state.scale)
-      const match = list.find((l) => l.id === pickedId)
+      const match = availableLayers(state.scale).find((l) => l.id === pickedId)
       if (match) return match
     }
     return active
@@ -1016,15 +738,11 @@ export function setup(ctx: SpindleFrontendContext) {
     const { x, y, w, h } = state.camera
     const nw = Math.max(18, Math.min(320, w * factor))
     const nh = Math.max(18, Math.min(320, h * factor))
-    state.camera = {
-      x: x + (w - nw) / 2,
-      y: y + (h - nh) / 2,
-      w: nw,
-      h: nh,
-    }
+    state.camera = { x: x + (w - nw) / 2, y: y + (h - nh) / 2, w: nw, h: nh }
     applyCamera()
   }
 
+  // ── Render: Map SVG ──
   function renderMapSvg(): void {
     svg.replaceChildren()
     const layer = currentLayer()
@@ -1033,29 +751,19 @@ export function setup(ctx: SpindleFrontendContext) {
     if (!state.activeChatId) {
       hudBadge.textContent = 'No Chat'
       emptyOverlay.hidden = false
-      emptyOverlay.replaceChildren(
-        el('strong', undefined, 'Open a roleplay chat'),
-        el('span', undefined, 'LumiAtlas tracks a separate 3-layer map per chat.'),
-      )
+      emptyOverlay.replaceChildren(el('strong', undefined, 'Open a roleplay chat'), el('span', undefined, 'LumiAtlas tracks states per chat.'))
       return
     }
 
-    hudBadge.textContent =
-      layer && layer.tiles.length > 0
-        ? `${layer.name}${state.scale === 'local' ? ` · F${state.floor}` : ''} (${tiles.length})`
-        : state.scale.toUpperCase()
+    hudBadge.textContent = layer && layer.tiles.length > 0
+      ? `${layer.name}${state.scale === 'local' ? ` · F${state.floor}` : ''} (${tiles.length})`
+      : state.scale.toUpperCase()
 
     if (!layer || tiles.length === 0) {
       emptyOverlay.hidden = false
       emptyOverlay.replaceChildren(
         el('strong', undefined, `No ${state.scale} tiles yet`),
-        el(
-          'span',
-          undefined,
-          state.config.connectionId
-            ? 'Click Analyze to generate your 3-layer Atlas.'
-            : 'Open Settings to pick your background model (e.g. Terra), then click Analyze.',
-        ),
+        el('span', undefined, state.config.connectionId ? 'Click Analyze to generate.' : 'Pick a model in Settings, then Analyze.'),
       )
       return
     }
@@ -1063,72 +771,26 @@ export function setup(ctx: SpindleFrontendContext) {
     emptyOverlay.hidden = true
     fitCamera(false)
 
-    // Defs: subtle grid + fog hatch pattern
     const defs = svgEl('defs')
-    const gridPat = svgEl('pattern', {
-      id: 'la-grid-pat',
-      width: 5,
-      height: 5,
-      patternUnits: 'userSpaceOnUse',
-    })
-    gridPat.append(
-      svgEl('path', {
-        d: 'M 5 0 L 0 0 0 5',
-        fill: 'none',
-        stroke: 'rgba(255,255,255,0.045)',
-        'stroke-width': 0.25,
-      }),
-    )
-    const fogPat = svgEl('pattern', {
-      id: 'la-fog-pat',
-      width: 4,
-      height: 4,
-      patternUnits: 'userSpaceOnUse',
-      patternTransform: 'rotate(45)',
-    })
-    fogPat.append(
-      svgEl('rect', { width: 4, height: 4, fill: '#262938' }),
-      svgEl('line', {
-        x1: 0,
-        y1: 0,
-        x2: 0,
-        y2: 4,
-        stroke: 'rgba(255,255,255,0.12)',
-        'stroke-width': 1.2,
-      }),
-    )
+    const gridPat = svgEl('pattern', { id: 'la-grid-pat', width: 5, height: 5, patternUnits: 'userSpaceOnUse' })
+    gridPat.append(svgEl('path', { d: 'M 5 0 L 0 0 0 5', fill: 'none', stroke: 'rgba(255,255,255,0.045)', 'stroke-width': 0.25 }))
+    const fogPat = svgEl('pattern', { id: 'la-fog-pat', width: 4, height: 4, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' })
+    fogPat.append(svgEl('rect', { width: 4, height: 4, fill: '#262938' }))
+    fogPat.append(svgEl('line', { x1: 0, y1: 0, x2: 0, y2: 4, stroke: 'rgba(255,255,255,0.12)', 'stroke-width': 1.2 }))
     defs.append(gridPat, fogPat)
     svg.append(defs)
 
-    // Background grid rect
-    svg.append(
-      svgEl('rect', {
-        x: -300,
-        y: -300,
-        width: 600,
-        height: 600,
-        fill: 'url(#la-grid-pat)',
-      }),
-    )
+    svg.append(svgEl('rect', { x: -300, y: -300, width: 600, height: 600, fill: 'url(#la-grid-pat)' }))
 
     const tileById = new Map(tiles.map((t) => [t.id, t]))
 
-    // Register per-tile clipPaths so labels and sheens never bleed outside tile borders
     for (const tile of tiles) {
       const clip = svgEl('clipPath', { id: `la-clip-${tile.id}` })
-      clip.append(
-        svgEl('rect', {
-          x: tile.x + 0.35,
-          y: tile.y + 0.35,
-          width: Math.max(0.5, tile.w - 0.7),
-          height: Math.max(0.5, tile.h - 0.7),
-          rx: state.scale === 'local' ? 0.6 : 1.0,
-        }),
-      )
+      clip.append(svgEl('rect', { x: tile.x + 0.35, y: tile.y + 0.35, width: Math.max(0.5, tile.w - 0.7), height: Math.max(0.5, tile.h - 0.7), rx: state.scale === 'local' ? 0.6 : 1.0 }))
       defs.append(clip)
     }
 
-    // 1. Tiles layer (fills, borders, click targets)
+    // Tiles
     const tilesLayer = svgEl('g', { class: 'la-layer-tiles' })
     for (const tile of tiles) {
       const isCurrent = layer.currentTileId === tile.id || tile.status === 'current'
@@ -1136,63 +798,35 @@ export function setup(ctx: SpindleFrontendContext) {
       const isFog = tile.status === 'locked' || tile.status === 'unexplored'
       const isRumored = tile.status === 'rumored'
 
-      const g = svgEl('g', {
-        class: `la-tile-group${isCurrent ? ' la-tile-current' : ''}${isSelected ? ' la-tile-selected' : ''}`,
-        'data-tile-id': tile.id,
-      })
-
+      const g = svgEl('g', { class: `la-tile-group${isCurrent ? ' la-tile-current' : ''}${isSelected ? ' la-tile-selected' : ''}`, 'data-tile-id': tile.id })
       const fillColor = isFog ? 'url(#la-fog-pat)' : defaultTileColor(tile, state.scale)
       const rect = svgEl('rect', {
-        class: 'la-tile-rect',
-        x: tile.x,
-        y: tile.y,
-        width: tile.w,
-        height: tile.h,
-        rx: state.scale === 'local' ? 0.8 : 1.2,
-        fill: fillColor,
-        stroke: isFog ? '#6b7280' : 'rgba(255,255,255,0.28)',
-        'stroke-width': state.scale === 'local' ? 0.35 : 0.4,
+        class: 'la-tile-rect', x: tile.x, y: tile.y, width: tile.w, height: tile.h,
+        rx: state.scale === 'local' ? 0.8 : 1.2, fill: fillColor,
+        stroke: isFog ? '#6b7280' : 'rgba(255,255,255,0.28)', 'stroke-width': state.scale === 'local' ? 0.35 : 0.4,
       })
       if (isRumored) rect.setAttribute('stroke-dasharray', '1.4 1.1')
       g.append(rect)
 
-      // Subtle top sheen
       if (!isFog) {
-        g.append(
-          svgEl('rect', {
-            x: tile.x + 0.25,
-            y: tile.y + 0.25,
-            width: Math.max(0, tile.w - 0.5),
-            height: Math.max(0, tile.h * 0.28),
-            rx: state.scale === 'local' ? 0.6 : 0.9,
-            fill: 'rgba(255,255,255,0.06)',
-            'pointer-events': 'none',
-          }),
-        )
+        g.append(svgEl('rect', { x: tile.x + 0.25, y: tile.y + 0.25, width: Math.max(0, tile.w - 0.5), height: Math.max(0, tile.h * 0.28), rx: state.scale === 'local' ? 0.6 : 0.9, fill: 'rgba(255,255,255,0.06)', 'pointer-events': 'none' }))
       }
 
       const titleTag = svgEl('title')
       titleTag.textContent = `${tile.name}${tile.sizeLabel ? ` (${tile.sizeLabel})` : ''}${tile.summary ? `\n${tile.summary}` : ''}`
       g.append(titleTag)
-
-      g.addEventListener('click', (ev) => {
-        ev.stopPropagation()
-        state.selectedTileId = tile.id
-        renderAll()
-      })
-
+      g.addEventListener('click', (ev) => { ev.stopPropagation(); state.selectedTileId = tile.id; renderAll() })
       tilesLayer.append(g)
     }
     svg.append(tilesLayer)
 
-    // 2. Roads & Doors layer (under labels & pins so routes never strike through text)
+    // Roads
     if (state.showRoads && layer.roads.length > 0) {
       const roadsLayer = svgEl('g', { class: 'la-layer-roads', 'pointer-events': 'none', opacity: '0.82' })
       for (const road of layer.roads) {
         const a = tileById.get(road.from)
         const b = tileById.get(road.to)
         if (!a || !b) continue
-
         const shared = findSharedEdge(a, b)
         if (state.scale === 'local' && shared && road.kind === 'door') {
           const doorLen = 2.2
@@ -1200,59 +834,20 @@ export function setup(ctx: SpindleFrontendContext) {
           const y1 = shared.orientation === 'vertical' ? shared.midY - doorLen / 2 : shared.midY
           const x2 = shared.orientation === 'horizontal' ? shared.midX + doorLen / 2 : shared.midX
           const y2 = shared.orientation === 'vertical' ? shared.midY + doorLen / 2 : shared.midY
-          roadsLayer.append(
-            svgEl('line', {
-              x1,
-              y1,
-              x2,
-              y2,
-              stroke: '#f5d08a',
-              'stroke-width': 1.05,
-              'stroke-linecap': 'round',
-            }),
-          )
+          roadsLayer.append(svgEl('line', { x1, y1, x2, y2, stroke: '#f5d08a', 'stroke-width': 1.05, 'stroke-linecap': 'round' }))
         } else {
           const [x1, y1, x2, y2] = connectorSegment(a, b)
-          const strokeColor =
-            road.kind === 'sea_route'
-              ? '#60a5fa'
-              : road.kind === 'transit'
-                ? '#c084fc'
-                : road.kind === 'stairs'
-                  ? '#fde047'
-                  : '#d4b47c'
-
-          // Outer dark casing for contrast
-          roadsLayer.append(
-            svgEl('line', {
-              x1,
-              y1,
-              x2,
-              y2,
-              stroke: 'rgba(15,17,26,0.68)',
-              'stroke-width': road.kind === 'road' ? 1.2 : 0.88,
-              'stroke-linecap': 'round',
-            }),
-          )
-          const line = svgEl('line', {
-            x1,
-            y1,
-            x2,
-            y2,
-            stroke: strokeColor,
-            'stroke-width': road.kind === 'road' ? 0.6 : 0.42,
-            'stroke-linecap': 'round',
-          })
-          if (road.kind === 'path' || road.kind === 'sea_route' || road.kind === 'stairs') {
-            line.setAttribute('stroke-dasharray', '1.3 1.0')
-          }
+          const strokeColor = road.kind === 'sea_route' ? '#60a5fa' : road.kind === 'transit' ? '#c084fc' : road.kind === 'stairs' ? '#fde047' : '#d4b47c'
+          roadsLayer.append(svgEl('line', { x1, y1, x2, y2, stroke: 'rgba(15,17,26,0.68)', 'stroke-width': road.kind === 'road' ? 1.2 : 0.88, 'stroke-linecap': 'round' }))
+          const line = svgEl('line', { x1, y1, x2, y2, stroke: strokeColor, 'stroke-width': road.kind === 'road' ? 0.6 : 0.42, 'stroke-linecap': 'round' })
+          if (road.kind === 'path' || road.kind === 'sea_route' || road.kind === 'stairs') line.setAttribute('stroke-dasharray', '1.3 1.0')
           roadsLayer.append(line)
         }
       }
       svg.append(roadsLayer)
     }
 
-    // 3. Tile Labels layer (wrapped, clipped strictly inside each tile, shifted up when pins are present)
+    // Labels
     if (state.showLabels) {
       const labelsLayer = svgEl('g', { class: 'la-layer-labels', 'pointer-events': 'none' })
       for (const tile of tiles) {
@@ -1262,15 +857,7 @@ export function setup(ctx: SpindleFrontendContext) {
         const labelZoneTop = tile.y + (hasPins ? tile.h * 0.06 : tile.h * 0.07)
         const cx = tile.x + tile.w / 2
         const usableW = Math.max(2.6, tile.w - 1.4)
-
-        const baseFont = Math.max(
-          0.95,
-          Math.min(
-            state.scale === 'local' ? 1.95 : 2.35,
-            usableW / 6.6,
-            labelZoneH / (tile.sizeLabel && !isFog ? 3.8 : 2.6),
-          ),
-        )
+        const baseFont = Math.max(0.95, Math.min(state.scale === 'local' ? 1.95 : 2.35, usableW / 6.6, labelZoneH / (tile.sizeLabel && !isFog ? 3.8 : 2.6)))
         const maxChars = Math.max(4, Math.floor(usableW / (baseFont * 0.6)))
         const maxLines = labelZoneH >= baseFont * 4.2 ? 3 : labelZoneH >= baseFont * 2.5 ? 2 : 1
         const rawLabel = isFog ? `🔒 ${tile.name}` : tile.name
@@ -1282,43 +869,25 @@ export function setup(ctx: SpindleFrontendContext) {
         const startY = labelZoneTop + (labelZoneH - totalTextH) / 2 + baseFont * 0.88
 
         const clippedGroup = svgEl('g', { 'clip-path': `url(#la-clip-${tile.id})` })
-        const labelEl = svgEl('text', {
-          class: 'la-tile-label',
-          x: cx,
-          y: startY.toFixed(2),
-          'text-anchor': 'middle',
-          'font-size': baseFont.toFixed(2),
-        })
-
+        const labelEl = svgEl('text', { class: 'la-tile-label', x: cx, y: startY.toFixed(2), 'text-anchor': 'middle', 'font-size': baseFont.toFixed(2) })
         lines.forEach((lineText, idx) => {
-          const tspan = svgEl('tspan', {
-            x: cx,
-            dy: idx === 0 ? '0' : lineHeight.toFixed(2),
-          })
+          const tspan = svgEl('tspan', { x: cx, dy: idx === 0 ? '0' : lineHeight.toFixed(2) })
           tspan.textContent = lineText
           labelEl.append(tspan)
         })
         clippedGroup.append(labelEl)
-
         if (showSize) {
           const sizeY = startY + (lines.length - 1) * lineHeight + sizeFont * 1.45
-          const sizeText = svgEl('text', {
-            class: 'la-tile-size',
-            x: cx,
-            y: sizeY.toFixed(2),
-            'text-anchor': 'middle',
-            'font-size': sizeFont.toFixed(2),
-          })
+          const sizeText = svgEl('text', { class: 'la-tile-size', x: cx, y: sizeY.toFixed(2), 'text-anchor': 'middle', 'font-size': sizeFont.toFixed(2) })
           sizeText.textContent = tile.sizeLabel
           clippedGroup.append(sizeText)
         }
-
         labelsLayer.append(clippedGroup)
       }
       svg.append(labelsLayer)
     }
 
-    // 4. Character Pins layer (dedicated lower pin band inside each tile, clipped and scaled)
+    // Pins
     if (state.showPins) {
       const pinsLayer = svgEl('g', { class: 'la-layer-pins' })
       for (const tile of tiles) {
@@ -1332,53 +901,19 @@ export function setup(ctx: SpindleFrontendContext) {
           const color = defaultPinColor(pin)
           const pinGroup = svgEl('g', { style: 'cursor:pointer' })
           const dotR = pin.isPlayer ? dotBase * 1.18 : dotBase
-
           if (pin.isPlayer) {
-            pinGroup.append(
-              svgEl('circle', {
-                cx: px.toFixed(2),
-                cy: py.toFixed(2),
-                r: (dotR * 1.75).toFixed(2),
-                fill: 'rgba(254, 240, 138, 0.26)',
-                stroke: '#fde047',
-                'stroke-width': 0.24,
-              }),
-            )
+            pinGroup.append(svgEl('circle', { cx: px.toFixed(2), cy: py.toFixed(2), r: (dotR * 1.75).toFixed(2), fill: 'rgba(254,240,138,0.26)', stroke: '#fde047', 'stroke-width': 0.24 }))
           }
-
-          pinGroup.append(
-            svgEl('circle', {
-              cx: px.toFixed(2),
-              cy: py.toFixed(2),
-              r: dotR.toFixed(2),
-              fill: color,
-              stroke: '#0f111a',
-              'stroke-width': 0.28,
-            }),
-          )
-
+          pinGroup.append(svgEl('circle', { cx: px.toFixed(2), cy: py.toFixed(2), r: dotR.toFixed(2), fill: color, stroke: '#0f111a', 'stroke-width': 0.28 }))
           const slotW = Math.max(3, (tile.w - 1.2) / Math.max(1, colsInRow))
           const maxPinChars = Math.max(4, Math.floor(slotW / (pinFont * 0.6)))
-          const pinLabel = svgEl('text', {
-            class: 'la-pin-label',
-            x: px.toFixed(2),
-            y: (py + dotR + pinFont * 1.05).toFixed(2),
-            'text-anchor': 'middle',
-            'font-size': pinFont.toFixed(2),
-          })
+          const pinLabel = svgEl('text', { class: 'la-pin-label', x: px.toFixed(2), y: (py + dotR + pinFont * 1.05).toFixed(2), 'text-anchor': 'middle', 'font-size': pinFont.toFixed(2) })
           pinLabel.textContent = shortPinLabel(pin.name, maxPinChars)
           pinGroup.append(pinLabel)
-
           const pinTitle = svgEl('title')
           pinTitle.textContent = `${pin.name}${pin.note ? ` — ${pin.note}` : ''}`
           pinGroup.append(pinTitle)
-
-          pinGroup.addEventListener('click', (ev) => {
-            ev.stopPropagation()
-            state.selectedTileId = tile.id
-            renderAll()
-          })
-
+          pinGroup.addEventListener('click', (ev) => { ev.stopPropagation(); state.selectedTileId = tile.id; renderAll() })
           tilePinGroup.append(pinGroup)
         }
         pinsLayer.append(tilePinGroup)
@@ -1387,53 +922,34 @@ export function setup(ctx: SpindleFrontendContext) {
     }
   }
 
+  // ── Render: Inspector ──
   function renderInspector(): void {
     inspector.replaceChildren()
     const layer = currentLayer()
     if (!layer || !layer.tiles.length) {
-      inspector.append(
-        el('div', 'la-subtitle', 'Select a tile after analyzing to inspect features, character pins, and routes.'),
-      )
+      inspector.append(el('div', 'la-subtitle', 'Select a tile to inspect.'))
       return
     }
-
     const visible = getVisibleTiles(layer, state.floor)
-    const tile =
-      visible.find((t) => t.id === state.selectedTileId) ??
-      visible.find((t) => t.id === layer.currentTileId) ??
-      visible[0]
-
+    const tile = visible.find((t) => t.id === state.selectedTileId) ?? visible.find((t) => t.id === layer.currentTileId) ?? visible[0]
     if (!tile) return
 
     const head = el('div', 'la-insp-head')
     head.append(el('div', 'la-insp-title', tile.name))
-
     const pills = el('div', 'la-pill-row')
-    const statusClass =
-      tile.status === 'current' || layer.currentTileId === tile.id
-        ? 'la-pill la-pill-current'
-        : tile.status === 'locked' || tile.status === 'unexplored'
-          ? 'la-pill la-pill-locked'
-          : 'la-pill'
+    const statusClass = tile.status === 'current' || layer.currentTileId === tile.id ? 'la-pill la-pill-current' : tile.status === 'locked' || tile.status === 'unexplored' ? 'la-pill la-pill-locked' : 'la-pill'
     pills.append(el('span', statusClass, layer.currentTileId === tile.id ? 'here' : tile.status))
     pills.append(el('span', 'la-pill', tile.kind))
     if (tile.sizeLabel) pills.append(el('span', 'la-pill', tile.sizeLabel))
     head.append(pills)
     inspector.append(head)
-
-    if (tile.summary) {
-      inspector.append(el('p', 'la-insp-summary', tile.summary))
-    }
-
+    if (tile.summary) inspector.append(el('p', 'la-insp-summary', tile.summary))
     if (tile.features.length > 0 && tile.status !== 'locked' && tile.status !== 'unexplored') {
       inspector.append(el('div', 'la-insp-section-label', 'Features & Hooks'))
       const ul = el('ul', 'la-feature-list')
-      for (const feat of tile.features) {
-        ul.append(el('li', undefined, feat))
-      }
+      for (const feat of tile.features) ul.append(el('li', undefined, feat))
       inspector.append(ul)
     }
-
     if (tile.pins.length > 0) {
       inspector.append(el('div', 'la-insp-section-label', 'Characters Here'))
       const row = el('div', 'la-chip-row')
@@ -1441,102 +957,123 @@ export function setup(ctx: SpindleFrontendContext) {
         const chip = el('span', 'la-pin-chip')
         const dot = el('span', 'la-pin-dot')
         dot.style.background = defaultPinColor(pin)
-        chip.append(
-          dot,
-          document.createTextNode(pin.note ? `${pin.name} (${pin.note})` : pin.name),
-        )
+        chip.append(dot, document.createTextNode(pin.note ? `${pin.name} (${pin.note})` : pin.name))
         row.append(chip)
       }
       inspector.append(row)
     }
-
     const neighborIds = new Set<string>(tile.connections)
     for (const road of layer.roads) {
       if (road.from === tile.id) neighborIds.add(road.to)
       if (road.to === tile.id) neighborIds.add(road.from)
     }
-    const neighbors = Array.from(neighborIds)
-      .map((id) => layer.tiles.find((t) => t.id === id))
-      .filter((t): t is Tile => !!t)
-
+    const neighbors = Array.from(neighborIds).map((id) => layer.tiles.find((t) => t.id === id)).filter((t): t is Tile => !!t)
     if (neighbors.length > 0) {
       inspector.append(el('div', 'la-insp-section-label', 'Connected Routes'))
       const row = el('div', 'la-chip-row')
       for (const n of neighbors) {
-        const btn = el(
-          'button',
-          'la-neighbor-btn',
-          n.floor !== tile.floor ? `${n.name} (F${n.floor})` : n.name,
-        )
+        const btn = el('button', 'la-neighbor-btn', n.floor !== tile.floor ? `${n.name} (F${n.floor})` : n.name)
         btn.type = 'button'
-        btn.addEventListener('click', () => {
-          state.floor = n.floor
-          state.selectedTileId = n.id
-          fitCamera(true)
-          renderAll()
-        })
+        btn.addEventListener('click', () => { state.floor = n.floor; state.selectedTileId = n.id; fitCamera(true); renderAll() })
         row.append(btn)
       }
       inspector.append(row)
     }
-
     if (state.atlas?.notes && state.atlas.notes.length > 0) {
       inspector.append(el('div', 'la-notes', state.atlas.notes.join(' · ')))
     }
   }
 
-  function renderStatePanel(): void {
-    statePanel.replaceChildren()
-    statePanel.hidden = state.view === 'map'
-    if (state.view === 'map') return
-    const title = STATE_VIEWS.find(([value]) => value === state.view)?.[1] ?? 'States'
-    statePanel.setAttribute('aria-label', title)
-    statePanel.append(el('div', 'la-insp-title', title))
+  // ── Render: State cards ──
+  function renderStateCards(): void {
+    statesContent.replaceChildren()
     if (!state.activeChatId) {
-      statePanel.append(el('p', 'la-subtitle', 'Open a chat to view its states.'))
+      statesContent.append(el('p', 'la-subtitle', 'Open a chat to view states.'))
       return
     }
     if (state.internalLoading) {
-      statePanel.append(el('p', 'la-subtitle', 'Loading states…'))
+      statesContent.append(el('p', 'la-subtitle', 'Loading states…'))
       return
     }
     if (state.internalInvalid || (state.error && !state.internalState)) {
-      statePanel.append(el('p', 'la-subtitle', 'Unable to load states.'))
+      statesContent.append(el('p', 'la-subtitle', 'Unable to load states.'))
       return
     }
     if (!state.internalState) {
-      statePanel.append(el('p', 'la-subtitle', 'No states available for this chat.'))
+      statesContent.append(el('p', 'la-subtitle', 'No states available for this chat.'))
       return
     }
-    if (state.view === 'ledger') {
-      const content = revealedLedger(state.internalState.ledger)
-      statePanel.append(content
-        ? el('pre', 'la-state-text', content)
-        : el('p', 'la-subtitle', 'No revealed Ledger available.'))
-      return
-    }
-    for (const [key, label] of STATE_GROUPS[state.view]) {
-      const section = el('section', 'la-state-section')
-      section.setAttribute('data-state-section', key)
-      section.append(el('div', 'la-insp-section-label', label))
-      const raw = state.internalState.sections[key] ?? ''
-      // Ledger is a separate gated payload; never render it through a state section.
-      const containsLedger = LEDGER_MARKUP.test(raw)
-      const content = formatStateText(raw, true)
-      const unsafeFallback = containsLedger && LEDGER_MARKUP.test(content)
-      section.append(el('pre', 'la-state-text', unsafeFallback
-        ? 'Ledger-like content omitted; check the Ledger view.' : content || 'No data available.'))
-      statePanel.append(section)
+
+    const group = STATE_GROUPS.find(g => g.id === state.stateGroup)
+    if (!group) return
+
+    for (const [sectionKey, sectionLabel] of group.sections) {
+      const raw = state.internalState.sections[sectionKey] ?? ''
+      if (!raw.trim()) {
+        const emptyGroup = el('div', 'la-state-group')
+        emptyGroup.append(el('div', 'la-state-group-title', sectionLabel))
+        const emptyCard = el('div', 'la-state-card')
+        emptyCard.append(el('div', 'la-state-card-body', 'No data available.'))
+        emptyGroup.append(emptyCard)
+        statesContent.append(emptyGroup)
+        continue
+      }
+
+      const groupEl = el('div', 'la-state-group')
+      groupEl.setAttribute('data-state-section', sectionKey)
+      groupEl.append(el('div', 'la-state-group-title', sectionLabel))
+
+      const cards = parseStateSection(raw)
+      for (const card of cards) {
+        const cardEl = el('div', 'la-state-card')
+        const headerEl = el('div', 'la-state-card-header')
+        headerEl.append(el('span', 'la-state-card-name', card.name))
+        if (card.badge) headerEl.append(el('span', 'la-state-card-badge', card.badge))
+        cardEl.append(headerEl)
+
+        if (card.fields.length) {
+          const bodyEl = el('div', 'la-state-card-body')
+          for (const field of card.fields) {
+            const fieldEl = el('div', 'la-state-field')
+            fieldEl.append(el('span', 'la-state-field-label', field.label))
+            fieldEl.append(el('span', 'la-state-field-value', field.value))
+            bodyEl.append(fieldEl)
+          }
+          cardEl.append(bodyEl)
+        } else if (card.rawText) {
+          cardEl.append(el('div', 'la-state-card-body', card.rawText))
+        }
+
+        groupEl.append(cardEl)
+      }
+      statesContent.append(groupEl)
     }
   }
 
+  // ── Render: Ledger ──
+  function renderLedger(): void {
+    ledgerBody.replaceChildren()
+    if (!state.activeChatId) {
+      ledgerBody.append(el('div', 'la-ledger-empty', 'Open a chat to view the ledger.'))
+      return
+    }
+    if (state.internalLoading) {
+      ledgerBody.append(el('div', 'la-ledger-empty', 'Loading…'))
+      return
+    }
+    const content = state.internalState ? revealedLedger(state.internalState.ledger) : null
+    if (content) {
+      ledgerBody.append(el('div', 'la-ledger-content', content))
+    } else {
+      ledgerBody.append(el('div', 'la-ledger-empty', 'No revealed Ledger available.'))
+    }
+  }
+
+  // ── Render All ──
   function renderAll(): void {
     if (state.destroyed) return
 
-    // Header
-    locationEl.textContent = state.atlas?.currentLocation && state.atlas.currentLocation !== 'Unknown'
-      ? state.atlas.currentLocation
-      : 'LumiAtlas'
+    locationEl.textContent = state.atlas?.currentLocation && state.atlas.currentLocation !== 'Unknown' ? state.atlas.currentLocation : 'LumiAtlas'
     subtitleEl.textContent = state.statusMessage
 
     const hasChat = !!state.activeChatId
@@ -1565,13 +1102,12 @@ export function setup(ctx: SpindleFrontendContext) {
     autoInput.disabled = !hasChat || !state.config.enabled
     reasoningInput.checked = state.config.reasoningMode !== 'off'
 
-    // Banners
     errorBanner.hidden = !state.error
     errorBanner.textContent = state.error ?? ''
     staleBanner.hidden = !state.atlas?.stale
     staleBanner.textContent = state.atlas?.staleReason ?? ''
 
-    // Live thinking / generation stream box
+    // Thinking panel
     const hasStream = state.busy || Boolean(state.stream && (state.stream.reasoning || state.stream.outputChars > 0))
     thinkingBox.hidden = !hasStream
     if (hasStream) {
@@ -1580,12 +1116,7 @@ export function setup(ctx: SpindleFrontendContext) {
       const outChars = state.stream?.outputChars ?? 0
       thinkingDot.classList.toggle('la-pulse', state.busy)
       if (state.busy) {
-        thinkingLabel.textContent =
-          phase === 'writing'
-            ? 'Writing Atlas JSON…'
-            : reasoningText
-              ? 'Model thinking…'
-              : 'Waiting for model…'
+        thinkingLabel.textContent = phase === 'writing' ? 'Writing Atlas JSON…' : reasoningText ? 'Model thinking…' : 'Waiting for model…'
       } else {
         thinkingLabel.textContent = reasoningText ? 'Last generation thoughts' : 'Last generation output'
       }
@@ -1594,57 +1125,37 @@ export function setup(ctx: SpindleFrontendContext) {
       if (outChars > 0) metaParts.push(`${outChars} JSON chars`)
       metaParts.push(state.thinkingOpen ? 'Hide' : 'Show')
       thinkingMeta.textContent = metaParts.join(' · ')
-
       thinkingBody.hidden = !state.thinkingOpen
       if (state.thinkingOpen) {
-        if (reasoningText) {
-          thinkingBody.textContent = reasoningText
-        } else if (state.stream?.outputTail) {
-          thinkingBody.textContent = `Generating map JSON (${outChars} chars)…\n${state.stream.outputTail}`
-        } else if (state.busy) {
-          thinkingBody.textContent =
-            state.config.reasoningMode === 'off'
-              ? 'Streaming JSON directly (thinking disabled in Settings)…'
-              : 'Waiting for reasoning tokens from model…'
-        } else {
-          thinkingBody.textContent = ''
-        }
+        if (reasoningText) thinkingBody.textContent = reasoningText
+        else if (state.stream?.outputTail) thinkingBody.textContent = `Generating map JSON (${outChars} chars)…\n${state.stream.outputTail}`
+        else if (state.busy) thinkingBody.textContent = state.config.reasoningMode === 'off' ? 'Streaming JSON directly…' : 'Waiting for reasoning tokens…'
+        else thinkingBody.textContent = ''
         thinkingBody.scrollTop = thinkingBody.scrollHeight
       }
     }
 
-    // State browser and map selector
-    viewSelect.value = state.view
+    // Map controls
     scaleSelect.value = state.scale
-    const showMap = state.view === 'map'
-    scaleSelect.disabled = !showMap
-    toolbar.hidden = !showMap
-    canvasWrap.hidden = !showMap
-    inspector.hidden = !showMap
     const layers = availableLayers(state.scale)
-    layerSelect.disabled = !showMap || layers.length === 0
-    layerSelect.replaceChildren()
+    zoneSelect.disabled = layers.length === 0
+    zoneSelect.replaceChildren()
     if (!layers.length) {
       const empty = el('option', undefined, 'No maps available')
       empty.value = ''
-      layerSelect.append(empty)
+      zoneSelect.append(empty)
     } else {
       const activeId = state.atlas?.maps?.[state.scale]?.id ?? null
       for (const l of layers) {
         const isCurrent = l.id === activeId
-        const opt = el(
-          'option',
-          undefined,
-          `${l.name} (${l.tiles.length} ${l.tiles.length === 1 ? 'tile' : 'tiles'})${isCurrent ? ' · Current' : ''}`,
-        )
+        const opt = el('option', undefined, `${l.name} (${l.tiles.length} ${l.tiles.length === 1 ? 'tile' : 'tiles'})${isCurrent ? ' · Current' : ''}`)
         opt.value = l.id
-        layerSelect.append(opt)
+        zoneSelect.append(opt)
       }
-      const currentId = currentLayer()?.id ?? layers[0]?.id ?? ''
-      layerSelect.value = currentId
+      zoneSelect.value = currentLayer()?.id ?? layers[0]?.id ?? ''
     }
 
-    // Floors (Local only when > 1 floor)
+    // Floors
     floorBar.replaceChildren()
     const layer = currentLayer()
     if (layer && state.scale === 'local') {
@@ -1653,11 +1164,7 @@ export function setup(ctx: SpindleFrontendContext) {
         for (const f of floors) {
           const btn = el('button', `la-btn${state.floor === f ? ' la-btn-active' : ''}`, `F${f}`)
           btn.type = 'button'
-          btn.addEventListener('click', () => {
-            state.floor = f
-            fitCamera(true)
-            renderAll()
-          })
+          btn.addEventListener('click', () => { state.floor = f; fitCamera(true); renderAll() })
           floorBar.append(btn)
         }
       }
@@ -1667,25 +1174,22 @@ export function setup(ctx: SpindleFrontendContext) {
     roadsToggle.classList.toggle('la-btn-active', state.showRoads)
     labelsToggle.classList.toggle('la-btn-active', state.showLabels)
 
+    // State group selector
+    stateGroupSelect.value = state.stateGroup
+
     renderMapSvg()
     renderInspector()
-    renderStatePanel()
+    renderStateCards()
+    renderLedger()
   }
 
-  // Event wiring
-  const on = <K extends keyof HTMLElementEventMap>(
-    target: HTMLElement,
-    type: K,
-    handler: (ev: HTMLElementEventMap[K]) => void,
-  ) => {
+  // ── Event wiring ──
+  const on = <K extends keyof HTMLElementEventMap>(target: HTMLElement, type: K, handler: (ev: HTMLElementEventMap[K]) => void) => {
     target.addEventListener(type, handler as EventListener)
     cleanups.push(() => target.removeEventListener(type, handler as EventListener))
   }
 
-  on(settingsBtn, 'click', () => {
-    state.settingsOpen = !state.settingsOpen
-    renderAll()
-  })
+  on(settingsBtn, 'click', () => { state.settingsOpen = !state.settingsOpen; renderAll() })
 
   on(connSelect, 'change', () => {
     const val = connSelect.value || null
@@ -1698,24 +1202,14 @@ export function setup(ctx: SpindleFrontendContext) {
   on(enabledInput, 'change', () => {
     if (!state.activeChatId) return
     state.config.enabled = enabledInput.checked
-    send({
-      type: 'set_chat_config',
-      chatId: state.activeChatId,
-      enabled: state.config.enabled,
-      autoUpdate: state.config.autoUpdate,
-    })
+    send({ type: 'set_chat_config', chatId: state.activeChatId, enabled: state.config.enabled, autoUpdate: state.config.autoUpdate })
     renderAll()
   })
 
   on(autoInput, 'change', () => {
     if (!state.activeChatId) return
     state.config.autoUpdate = autoInput.checked
-    send({
-      type: 'set_chat_config',
-      chatId: state.activeChatId,
-      enabled: state.config.enabled,
-      autoUpdate: state.config.autoUpdate,
-    })
+    send({ type: 'set_chat_config', chatId: state.activeChatId, enabled: state.config.enabled, autoUpdate: state.config.autoUpdate })
     renderAll()
   })
 
@@ -1726,20 +1220,17 @@ export function setup(ctx: SpindleFrontendContext) {
     renderAll()
   })
 
-  on(thinkingHead, 'click', () => {
-    state.thinkingOpen = !state.thinkingOpen
+  on(thinkingHead, 'click', () => { state.thinkingOpen = !state.thinkingOpen; renderAll() })
+
+  on(stateGroupSelect, 'change', () => {
+    const group = STATE_GROUPS.find(g => g.id === stateGroupSelect.value)
+    if (!group) return
+    state.stateGroup = group.id
     renderAll()
   })
 
-  on(viewSelect, 'change', () => {
-    const view = STATE_VIEWS.find(([value]) => value === viewSelect.value)
-    if (!view) return
-    state.view = view[0]
-    renderAll()
-  })
-
-  on(layerSelect, 'change', () => {
-    const picked = layerSelect.value || null
+  on(zoneSelect, 'change', () => {
+    const picked = zoneSelect.value || null
     if (!picked || !availableLayers(state.scale).some(layer => layer.id === picked)) return
     const activeId = state.atlas?.maps?.[state.scale]?.id ?? null
     state.selectedLayerId[state.scale] = picked === activeId ? null : picked
@@ -1750,10 +1241,7 @@ export function setup(ctx: SpindleFrontendContext) {
     renderAll()
   })
 
-  on(refreshBtn, 'click', () => {
-    state.error = null
-    requestInit()
-  })
+  on(refreshBtn, 'click', () => { state.error = null; requestInit() })
 
   on(analyzeBtn, 'click', () => {
     if (!state.activeChatId || state.busy) return
@@ -1793,29 +1281,16 @@ export function setup(ctx: SpindleFrontendContext) {
     renderAll()
   })
 
-  on(pinsToggle, 'click', () => {
-    state.showPins = !state.showPins
-    renderAll()
-  })
-  on(roadsToggle, 'click', () => {
-    state.showRoads = !state.showRoads
-    renderAll()
-  })
-  on(labelsToggle, 'click', () => {
-    state.showLabels = !state.showLabels
-    renderAll()
-  })
-
+  on(pinsToggle, 'click', () => { state.showPins = !state.showPins; renderAll() })
+  on(roadsToggle, 'click', () => { state.showRoads = !state.showRoads; renderAll() })
+  on(labelsToggle, 'click', () => { state.showLabels = !state.showLabels; renderAll() })
   on(zoomInBtn, 'click', () => zoom(0.78))
   on(zoomOutBtn, 'click', () => zoom(1.28))
   on(fitBtn, 'click', () => fitCamera(true))
 
   // Pointer pan + wheel zoom
   let dragging = false
-  let dragStartX = 0
-  let dragStartY = 0
-  let camStartX = 0
-  let camStartY = 0
+  let dragStartX = 0, dragStartY = 0, camStartX = 0, camStartY = 0
 
   on(canvasWrap, 'pointerdown', (ev) => {
     if (ev.button !== 0 || (ev.target as HTMLElement)?.closest('button')) return
@@ -1825,11 +1300,7 @@ export function setup(ctx: SpindleFrontendContext) {
     camStartX = state.camera.x
     camStartY = state.camera.y
     canvasWrap.classList.add('la-dragging')
-    try {
-      canvasWrap.setPointerCapture(ev.pointerId)
-    } catch {
-      // ignore if unsupported in mock DOM
-    }
+    try { canvasWrap.setPointerCapture(ev.pointerId) } catch { /* ignore */ }
   })
 
   on(canvasWrap, 'pointermove', (ev) => {
@@ -1843,10 +1314,7 @@ export function setup(ctx: SpindleFrontendContext) {
     applyCamera()
   })
 
-  const endDrag = () => {
-    dragging = false
-    canvasWrap.classList.remove('la-dragging')
-  }
+  const endDrag = () => { dragging = false; canvasWrap.classList.remove('la-dragging') }
   on(canvasWrap, 'pointerup', endDrag)
   on(canvasWrap, 'pointercancel', endDrag)
 
@@ -1855,7 +1323,7 @@ export function setup(ctx: SpindleFrontendContext) {
     zoom(ev.deltaY > 0 ? 1.14 : 0.88)
   })
 
-  // Backend message handling
+  // ── Backend messages ──
   const unsubBackend = ctx.onBackendMessage((raw: unknown) => {
     if (state.destroyed || !raw || typeof raw !== 'object') return
     const msg = raw as BackendToFrontendMessage & { internalState?: unknown }
@@ -1883,9 +1351,7 @@ export function setup(ctx: SpindleFrontendContext) {
       const layer = currentLayer()
       const validFloors = layer ? getFloors(layer) : []
       if (!validFloors.includes(state.floor)) state.floor = layer?.activeFloor ?? 0
-      if (!layer?.tiles.some(tile => tile.id === state.selectedTileId)) {
-        state.selectedTileId = layer?.currentTileId ?? null
-      }
+      if (!layer?.tiles.some(tile => tile.id === state.selectedTileId)) state.selectedTileId = layer?.currentTileId ?? null
       fitCamera(false)
       renderAll()
       return
@@ -1894,12 +1360,7 @@ export function setup(ctx: SpindleFrontendContext) {
     if (msg.type === 'stream') {
       if (!state.activeChatId || msg.chatId !== state.activeChatId) return
       state.busy = true
-      state.stream = {
-        phase: msg.phase,
-        reasoning: msg.reasoning,
-        outputChars: msg.outputChars,
-        outputTail: msg.outputTail,
-      }
+      state.stream = { phase: msg.phase, reasoning: msg.reasoning, outputChars: msg.outputChars, outputTail: msg.outputTail }
       renderAll()
       return
     }
@@ -1918,9 +1379,7 @@ export function setup(ctx: SpindleFrontendContext) {
         state.atlas = msg.state
         reconcileSelectedLayers()
         const layer = currentLayer()
-        if (!layer?.tiles.some(tile => tile.id === state.selectedTileId)) {
-          state.selectedTileId = layer?.currentTileId ?? null
-        }
+        if (!layer?.tiles.some(tile => tile.id === state.selectedTileId)) state.selectedTileId = layer?.currentTileId ?? null
       }
       if (msg.archives && msg.state === undefined) reconcileSelectedLayers()
       state.busy = msg.status === 'updating'
@@ -1928,11 +1387,8 @@ export function setup(ctx: SpindleFrontendContext) {
       state.error = msg.status === 'error' ? msg.message : null
       if (msg.status === 'ready') {
         tab.setBadge(null)
-        if (state.stream && !state.stream.reasoning) {
-          state.stream = null
-        } else if (state.stream) {
-          state.thinkingOpen = false
-        }
+        if (state.stream && !state.stream.reasoning) state.stream = null
+        else if (state.stream) state.thinkingOpen = false
         fitCamera(false)
       } else if (msg.status === 'updating') {
         tab.setBadge('…')
@@ -1946,10 +1402,8 @@ export function setup(ctx: SpindleFrontendContext) {
   })
 
   const unsubChat = ctx.events.on('CHAT_SWITCHED', (payload: unknown) => {
-    const nextId =
-      payload && typeof payload === 'object' && typeof (payload as Record<string, unknown>).chatId === 'string'
-        ? ((payload as Record<string, unknown>).chatId as string)
-        : null
+    const nextId = payload && typeof payload === 'object' && typeof (payload as Record<string, unknown>).chatId === 'string'
+      ? ((payload as Record<string, unknown>).chatId as string) : null
     state.activeChatId = nextId
     state.atlas = null
     state.internalState = null
@@ -1970,9 +1424,7 @@ export function setup(ctx: SpindleFrontendContext) {
     requestInit()
   })
 
-  const unsubActivate = tab.onActivate(() => {
-    requestInit()
-  })
+  const unsubActivate = tab.onActivate(() => { requestInit() })
 
   renderAll()
   requestInit()
