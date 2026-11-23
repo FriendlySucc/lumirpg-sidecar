@@ -230,6 +230,54 @@ const STYLES = `
 .la-card-field-value { color: #c4bcb0; font-size: 11px; }
 .la-card-location { font-size: 10px; color: #8a8078; margin-bottom: 4px; }
 
+/* ── Pair metric bars ── */
+.la-pair-bars { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.la-pair-bar-row { display: flex; align-items: center; gap: 4px; }
+.la-pair-bar-label { font-size: 10px; font-weight: 600; min-width: 70px; }
+.la-pair-left { text-align: right; color: #e87a6a; }
+.la-pair-right { text-align: left; color: #6ab4e8; }
+.la-pair-bar { flex: 1; height: 8px; background: #252018; border-radius: 3px; overflow: hidden; position: relative; }
+.la-pair-bar-left { direction: rtl; }
+.la-pair-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #c4973c, #e8b84e); }
+.la-pair-bar-left .la-pair-bar-fill { background: linear-gradient(90deg, #e87a6a, #c45a4a); }
+
+/* ── Dams sections ── */
+.la-dam-section { margin-top: 6px; padding: 4px 6px; background: rgba(196,151,60,0.03); border-radius: 4px; border: 1px solid #252018; }
+.la-dam-section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8078; margin-bottom: 4px; }
+.la-dam-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 2px 0; }
+.la-dam-toggle-label { font-size: 11px; font-weight: 600; color: #c4bcb0; }
+.la-dam-toggle-val { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+.la-dam-sealed { background: rgba(196,151,60,0.15); color: #c4973c; border: 1px solid #c4973c; }
+.la-dam-open { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid #4ade80; }
+.la-dam-yes { background: rgba(244,114,182,0.12); color: #f472b6; border: 1px solid #f472b6; }
+.la-dam-no { background: rgba(255,255,255,0.06); color: #a0a0a0; border: 1px solid #555; }
+.la-dam-filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.la-dam-filter-cell { padding: 4px; background: #1a1612; border-radius: 4px; border: 1px solid #2a2520; }
+.la-dam-filter-name { font-size: 10px; font-weight: 700; color: #c4bcb0; margin-bottom: 2px; }
+.la-dam-filter-val { font-size: 10px; font-weight: 600; }
+.la-dam-crack { color: #c4973c; }
+.la-dam-hard { color: #e87a6a; }
+.la-dam-intent { margin-top: 6px; padding: 4px 6px; font-size: 11px; color: #c4bcb0; background: rgba(196,151,60,0.04); border-radius: 4px; }
+.la-dam-intent-label { font-weight: 700; color: #c4973c; }
+
+/* ── Thoughts Q&A cards ── */
+.la-qa-card { margin-top: 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid #2a2520; }
+.la-qa-odd { background: #1a1612; margin-right: 12px; }
+.la-qa-even { background: #1e1814; margin-left: 12px; }
+.la-qa-badge { display: inline-block; font-size: 9px; font-weight: 700; padding: 0 5px; border-radius: 3px; background: rgba(167,139,250,0.15); color: #a78bfa; border: 1px solid #a78bfa; margin-bottom: 3px; }
+.la-qa-question { font-size: 11px; font-weight: 700; color: #e8d5a0; margin-bottom: 2px; }
+.la-qa-answer { font-size: 11px; color: #c4bcb0; }
+
+/* ── Inventory fields ── */
+.la-inv-field { margin-top: 3px; font-size: 11px; }
+.la-inv-field-label { font-weight: 700; color: #c4973c; }
+.la-inv-field-value { color: #c4bcb0; }
+.la-inv-detail { margin-top: 3px; font-size: 11px; }
+.la-inv-detail-label { font-weight: 700; color: #c4973c; }
+
+/* ── Notebook entries ── */
+.la-notebook-entry .la-card-body { padding: 4px 8px; }
+
 /* ── Location cards (Rendered style) ── */
 .la-location-card {
   display: flex; align-items: center; gap: 6px;
@@ -421,6 +469,339 @@ interface StateRecord {
   rawText: string
 }
 
+/* ── Section-specific renderers ── */
+// Forward declaration for the refresh callback used by collapsible cards
+let refreshStateContent: () => void = () => {}
+
+function renderFlatList(raw: string, container: HTMLElement, sectionColor: string): void {
+  const records = parseStateRecords(raw)
+  for (const record of records) {
+    const card = el('div', 'la-card')
+    const head = el('div', 'la-card-head la-flat')
+    const dot = el('span', 'la-card-dot')
+    dot.style.background = sectionColor
+    const name = el('span', 'la-card-name', record.name)
+    head.append(dot, name)
+    if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
+    card.append(head)
+    const body = el('div', 'la-card-body')
+    if (record.location) body.append(el('div', 'la-card-location', `→ ${record.location}`))
+    if (record.fields.length) {
+      const fields = el('div', 'la-card-fields')
+      for (const field of record.fields) {
+        const fieldEl = el('div', 'la-card-field')
+        fieldEl.append(el('span', 'la-card-field-label', field.label))
+        fieldEl.append(el('span', 'la-card-field-value', field.value))
+        fields.append(fieldEl)
+      }
+      body.append(fields)
+    }
+    if (record.details.length) {
+      for (const detail of record.details) {
+        const detailEl = el('div', 'la-card-detail')
+        detailEl.append(el('div', 'la-card-detail-title', detail.title))
+        detailEl.append(el('div', 'la-card-detail-text', detail.text))
+        body.append(detailEl)
+      }
+    }
+    if (record.rawText && !record.fields.length && !record.details.length) {
+      body.append(el('div', 'la-card-detail-text', record.rawText))
+    }
+    card.append(body)
+    container.append(card)
+  }
+}
+
+function renderCollapsibleCards(raw: string, container: HTMLElement, sectionColor: string, expandedCards: Set<string>, sectionId: string): void {
+  const records = parseStateRecords(raw)
+  for (const record of records) {
+    const cardId = `${sectionId}:${record.name}`
+    const isExpanded = expandedCards.has(cardId)
+    const card = el('div', 'la-card')
+    const head = el('div', `la-card-head${isExpanded ? ' la-expanded' : ''}`)
+    const chevron = el('span', 'la-card-chevron', isExpanded ? '▾' : '▸')
+    const dot = el('span', 'la-card-dot')
+    dot.style.background = sectionColor
+    const name = el('span', 'la-card-name', record.name)
+    head.append(chevron, dot, name)
+    if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
+    card.append(head)
+    if (isExpanded) {
+      const body = el('div', 'la-card-body')
+      if (record.location) body.append(el('div', 'la-card-location', `→ ${record.location}`))
+      if (record.fields.length) {
+        const fields = el('div', 'la-card-fields')
+        for (const field of record.fields) {
+          const fieldEl = el('div', 'la-card-field')
+          fieldEl.append(el('span', 'la-card-field-label', field.label))
+          fieldEl.append(el('span', 'la-card-field-value', field.value))
+          fields.append(fieldEl)
+        }
+        body.append(fields)
+      }
+      if (record.details.length) {
+        for (const detail of record.details) {
+          const detailEl = el('div', 'la-card-detail')
+          detailEl.append(el('div', 'la-card-detail-title', detail.title))
+          detailEl.append(el('div', 'la-card-detail-text', detail.text))
+          body.append(detailEl)
+        }
+      }
+      if (record.rawText && !record.fields.length && !record.details.length) {
+        body.append(el('div', 'la-card-detail-text', record.rawText))
+      }
+      card.append(body)
+    }
+    head.addEventListener('click', () => {
+      if (expandedCards.has(cardId)) expandedCards.delete(cardId)
+      else expandedCards.add(cardId)
+      refreshStateContent()
+    })
+    container.append(card)
+  }
+}
+
+/* ── Pair metrics bar renderer ── */
+function renderPairMetrics(raw: string, container: HTMLElement): void {
+  const records = parseStateRecords(raw)
+  for (const record of records) {
+    const card = el('div', 'la-card')
+    const head = el('div', 'la-card-head')
+    const chevron = el('span', 'la-card-chevron', '▾')
+    const icon = el('span', undefined, '💚')
+    const name = el('span', 'la-card-name', record.name)
+    const badge = el('span', 'la-card-badge', record.badge || 'PAIR')
+    head.append(chevron, icon, name, badge)
+    card.append(head)
+    const body = el('div', 'la-card-body')
+    // Parse pair-specific fields for bidirectional bars
+    const pairFields: Array<{ left: string; leftVal: string; right: string; rightVal: string }> = []
+    for (const field of record.fields) {
+      const match = field.value.match(/^(.+?)\s*(\d+)\s*acc\s*(\d+)$/i)
+      if (match) {
+        pairFields.push({ left: field.label, leftVal: match[2], right: field.label, rightVal: match[2] })
+      } else {
+        const fieldEl = el('div', 'la-card-field')
+        fieldEl.append(el('span', 'la-card-field-label', field.label))
+        fieldEl.append(el('span', 'la-card-field-value', field.value))
+        body.append(fieldEl)
+      }
+    }
+    // Render metric bars
+    if (pairFields.length) {
+      const bars = el('div', 'la-pair-bars')
+      for (const pf of pairFields) {
+        const barRow = el('div', 'la-pair-bar-row')
+        const leftLabel = el('span', 'la-pair-bar-label la-pair-left', pf.left)
+        const leftBar = el('div', 'la-pair-bar la-pair-bar-left')
+        const leftFill = el('div', 'la-pair-bar-fill')
+        leftFill.style.width = `${Math.min(100, parseInt(pf.leftVal) * 8)}%`
+        leftBar.append(leftFill)
+        const rightBar = el('div', 'la-pair-bar la-pair-bar-right')
+        const rightFill = el('div', 'la-pair-bar-fill')
+        rightFill.style.width = `${Math.min(100, parseInt(pf.rightVal) * 8)}%`
+        rightBar.append(rightFill)
+        const rightLabel = el('span', 'la-pair-bar-label la-pair-right', pf.right)
+        barRow.append(leftLabel, leftBar, rightBar, rightLabel)
+        bars.append(barRow)
+      }
+      body.append(bars)
+    }
+    for (const detail of record.details) {
+      const detailEl = el('div', 'la-card-detail')
+      detailEl.append(el('div', 'la-card-detail-title', detail.title))
+      detailEl.append(el('div', 'la-card-detail-text', detail.text))
+      body.append(detailEl)
+    }
+    card.append(body)
+    container.append(card)
+  }
+}
+
+/* ── Dams SLUICES/FLAGS/FILTERS renderer ── */
+function renderDams(raw: string, container: HTMLElement): void {
+  const records = parseStateRecords(raw)
+  for (const record of records) {
+    const card = el('div', 'la-card')
+    const head = el('div', 'la-card-head')
+    const chevron = el('span', 'la-card-chevron', '▾')
+    const icon = el('span', undefined, '🪵')
+    const name = el('span', 'la-card-name', record.name)
+    const badge = el('span', 'la-card-badge', record.badge || 'DIRECTIONAL')
+    head.append(chevron, icon, name, badge)
+    card.append(head)
+    const body = el('div', 'la-card-body')
+    // Group fields into SLUICES, FLAGS, FILTERS, INTENT
+    const sluices: Array<{ label: string; value: string }> = []
+    const flags: Array<{ label: string; value: string }> = []
+    const filters: Array<{ label: string; value: string }> = []
+    let intent = ''
+    for (const field of record.fields) {
+      const l = field.label.toUpperCase()
+      if (l.includes('SLUICE') || l === 'E' || l === 'L' || l === 'EMOTION' || l === 'LANGUAGE') {
+        sluices.push(field)
+      } else if (l.includes('FLAG') || l === 'CLASH' || l === 'TENSION') {
+        flags.push(field)
+      } else if (l.includes('FILTER') || l === 'SOCIAL' || l === 'VALUES' || l === 'COMPETENCE' || l === 'RELATIONSHIP') {
+        filters.push(field)
+      } else if (l.includes('INTENT')) {
+        intent = field.value
+      } else {
+        const fieldEl = el('div', 'la-card-field')
+        fieldEl.append(el('span', 'la-card-field-label', field.label))
+        fieldEl.append(el('span', 'la-card-field-value', field.value))
+        body.append(fieldEl)
+      }
+    }
+    // SLUICES toggles
+    if (sluices.length) {
+      const sluiceBox = el('div', 'la-dam-section')
+      sluiceBox.append(el('div', 'la-dam-section-title', 'SLUICES'))
+      for (const s of sluices) {
+        const row = el('div', 'la-dam-toggle-row')
+        row.append(el('span', 'la-dam-toggle-label', s.label))
+        const val = el('span', `la-dam-toggle-val ${s.value.toLowerCase().includes('open') ? 'la-dam-open' : 'la-dam-sealed'}`, s.value)
+        row.append(val)
+        sluiceBox.append(row)
+      }
+      body.append(sluiceBox)
+    }
+    // FLAGS toggles
+    if (flags.length) {
+      const flagBox = el('div', 'la-dam-section')
+      flagBox.append(el('div', 'la-dam-section-title', 'FLAGS'))
+      for (const f of flags) {
+        const row = el('div', 'la-dam-toggle-row')
+        row.append(el('span', 'la-dam-toggle-label', f.label))
+        const val = el('span', `la-dam-toggle-val ${f.value.toLowerCase().includes('yes') ? 'la-dam-yes' : 'la-dam-no'}`, f.value)
+        row.append(val)
+        flagBox.append(row)
+      }
+      body.append(flagBox)
+    }
+    // FILTERS grid
+    if (filters.length) {
+      const filterBox = el('div', 'la-dam-section')
+      filterBox.append(el('div', 'la-dam-section-title', 'FILTERS'))
+      const grid = el('div', 'la-dam-filter-grid')
+      for (const f of filters) {
+        const cell = el('div', 'la-dam-filter-cell')
+        cell.append(el('div', 'la-dam-filter-name', f.label))
+        cell.append(el('div', `la-dam-filter-val ${f.value.toLowerCase().includes('crack') ? 'la-dam-crack' : f.value.toLowerCase().includes('hard') ? 'la-dam-hard' : 'la-dam-open'}`, f.value))
+        grid.append(cell)
+      }
+      filterBox.append(grid)
+      body.append(filterBox)
+    }
+    // INTENT
+    if (intent) {
+      const intentEl = el('div', 'la-dam-intent')
+      intentEl.append(el('span', undefined, '🎯 '), el('span', 'la-dam-intent-label', 'INTENT: '), el('span', undefined, intent))
+      body.append(intentEl)
+    }
+    for (const detail of record.details) {
+      const detailEl = el('div', 'la-card-detail')
+      detailEl.append(el('div', 'la-card-detail-title', detail.title))
+      detailEl.append(el('div', 'la-card-detail-text', detail.text))
+      body.append(detailEl)
+    }
+    card.append(body)
+    container.append(card)
+  }
+}
+
+/* ── Thoughts Q&A renderer ── */
+function renderThoughts(raw: string, container: HTMLElement): void {
+  const records = parseStateRecords(raw)
+  for (const record of records) {
+    const card = el('div', 'la-card')
+    const head = el('div', 'la-card-head')
+    const chevron = el('span', 'la-card-chevron', '▾')
+    const icon = el('span', undefined, '💭')
+    const name = el('span', 'la-card-name', record.name)
+    const badge = el('span', 'la-card-badge', record.badge || 'BTS INTERVIEW')
+    head.append(chevron, icon, name, badge)
+    card.append(head)
+    const body = el('div', 'la-card-body')
+    // Parse Q&A from details
+    let qNum = 0
+    for (const detail of record.details) {
+      qNum++
+      const qa = el('div', `la-qa-card ${qNum % 2 === 0 ? 'la-qa-even' : 'la-qa-odd'}`)
+      const qBadge = el('span', 'la-qa-badge', `Q${qNum}`)
+      const qText = el('div', 'la-qa-question', detail.title)
+      const aText = el('div', 'la-qa-answer', detail.text)
+      qa.append(qBadge, qText, aText)
+      body.append(qa)
+    }
+    if (record.rawText && !record.details.length) {
+      body.append(el('div', 'la-card-detail-text', record.rawText))
+    }
+    card.append(body)
+    container.append(card)
+  }
+}
+
+/* ── Inventory labeled sections renderer ── */
+function renderInventory(raw: string, container: HTMLElement): void {
+  const records = parseStateRecords(raw)
+  for (const record of records) {
+    const card = el('div', 'la-card')
+    const head = el('div', 'la-card-head la-flat')
+    const dot = el('span', 'la-card-dot')
+    dot.style.background = '#a3a3a3'
+    const name = el('span', 'la-card-name', record.name)
+    head.append(dot, name)
+    card.append(head)
+    const body = el('div', 'la-card-body')
+    // Show all fields and details as full text
+    for (const field of record.fields) {
+      const fieldEl = el('div', 'la-inv-field')
+      fieldEl.append(el('span', 'la-inv-field-label', `${field.label}: `))
+      fieldEl.append(el('span', 'la-inv-field-value', field.value))
+      body.append(fieldEl)
+    }
+    for (const detail of record.details) {
+      const detailEl = el('div', 'la-inv-detail')
+      detailEl.append(el('span', 'la-inv-detail-label', `${detail.title}: `))
+      detailEl.append(el('span', undefined, detail.text))
+      body.append(detailEl)
+    }
+    if (record.rawText && !record.fields.length && !record.details.length) {
+      body.append(el('div', 'la-card-detail-text', record.rawText))
+    }
+    card.append(body)
+    container.append(card)
+  }
+}
+
+/* ── Notebook entries renderer ── */
+function renderNotebook(raw: string, container: HTMLElement): void {
+  const records = parseStateRecords(raw)
+  for (const record of records) {
+    const card = el('div', 'la-card la-notebook-entry')
+    const head = el('div', 'la-card-head la-flat')
+    const dot = el('span', 'la-card-dot')
+    dot.style.background = '#a3a3a3'
+    const name = el('span', 'la-card-name', record.name)
+    head.append(dot, name)
+    if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
+    card.append(head)
+    const body = el('div', 'la-card-body')
+    if (record.rawText) {
+      body.append(el('div', 'la-card-detail-text', record.rawText))
+    }
+    for (const field of record.fields) {
+      body.append(el('div', 'la-card-detail-text', `${field.label}: ${field.value}`))
+    }
+    for (const detail of record.details) {
+      body.append(el('div', 'la-card-detail-text', `${detail.title}: ${detail.text}`))
+    }
+    card.append(body)
+    container.append(card)
+  }
+}
+
 function parseStateRecords(raw: string): StateRecord[] {
   const input = raw.trim()
   if (!input) return []
@@ -474,7 +855,7 @@ function parseStateRecords(raw: string): StateRecord[] {
       }
 
       if (name === record.tagName.replace(/_/g, ' ') && !record.children.length) {
-        name = record.textContent?.trim()?.slice(0, 40) ?? name
+        name = record.textContent?.trim() ?? name
       }
 
       records.push({ name, badge, location, fields, details, rawText: '' })
@@ -1147,6 +1528,7 @@ export function setup(ctx: SpindleFrontendContext) {
   }
 
   // ── Render: State content with collapsible cards ──
+  refreshStateContent = renderStateContent
   function renderStateContent(): void {
     stateContent.replaceChildren()
     if (!state.activeChatId) {
@@ -1175,98 +1557,30 @@ export function setup(ctx: SpindleFrontendContext) {
       return
     }
 
-    const records = parseStateRecords(raw)
-    for (const record of records) {
-      const cardId = `${section.id}:${record.name}`
-      const isExpanded = state.expandedCards.has(cardId)
-
-      const card = el('div', 'la-card')
-
-      if (section.collapsible) {
-        // ── Collapsible record card (character, location, etc.) ──
-        const head = el('div', `la-card-head${isExpanded ? ' la-expanded' : ''}`)
-        const chevron = el('span', 'la-card-chevron', isExpanded ? '▾' : '▸')
-        const dot = el('span', 'la-card-dot')
-        dot.style.background = section.color
-        const name = el('span', 'la-card-name', record.name)
-        head.append(chevron, dot, name)
-        if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
-        card.append(head)
-
-        if (isExpanded) {
-          const body = el('div', 'la-card-body')
-          if (record.location) {
-            body.append(el('div', 'la-card-location', `→ ${record.location}`))
-          }
-          if (record.fields.length) {
-            const fields = el('div', 'la-card-fields')
-            for (const field of record.fields) {
-              const fieldEl = el('div', 'la-card-field')
-              fieldEl.append(el('span', 'la-card-field-label', field.label))
-              fieldEl.append(el('span', 'la-card-field-value', field.value))
-              fields.append(fieldEl)
-            }
-            body.append(fields)
-          }
-          if (record.details.length) {
-            for (const detail of record.details) {
-              const detailEl = el('div', 'la-card-detail')
-              detailEl.append(el('div', 'la-card-detail-title', detail.title))
-              detailEl.append(el('div', 'la-card-detail-text', detail.text))
-              body.append(detailEl)
-            }
-          }
-          if (record.rawText && !record.fields.length && !record.details.length) {
-            body.append(el('div', 'la-card-detail-text', record.rawText))
-          }
-          card.append(body)
+    // Use section-specific renderers for specialized layouts
+    switch (section.id) {
+      case 'pair':
+        renderPairMetrics(raw, stateContent)
+        break
+      case 'dam':
+        renderDams(raw, stateContent)
+        break
+      case 'thoughts':
+        renderThoughts(raw, stateContent)
+        break
+      case 'inv':
+        renderInventory(raw, stateContent)
+        break
+      case 'notebook':
+        renderNotebook(raw, stateContent)
+        break
+      default:
+        if (section.collapsible) {
+          renderCollapsibleCards(raw, stateContent, section.color, state.expandedCards, section.id)
+        } else {
+          renderFlatList(raw, stateContent, section.color)
         }
-
-        head.addEventListener('click', () => {
-          if (state.expandedCards.has(cardId)) state.expandedCards.delete(cardId)
-          else state.expandedCards.add(cardId)
-          renderStateContent()
-        })
-      } else {
-        // ── Flat labeled section (inventory, notebook, world, etc.) ──
-        const head = el('div', 'la-card-head la-flat')
-        const dot = el('span', 'la-card-dot')
-        dot.style.background = section.color
-        const name = el('span', 'la-card-name', record.name)
-        head.append(dot, name)
-        if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
-        card.append(head)
-
-        // Always show content for flat sections
-        const body = el('div', 'la-card-body')
-        if (record.location) {
-          body.append(el('div', 'la-card-location', `→ ${record.location}`))
-        }
-        if (record.fields.length) {
-          const fields = el('div', 'la-card-fields')
-          for (const field of record.fields) {
-            const fieldEl = el('div', 'la-card-field')
-            fieldEl.append(el('span', 'la-card-field-label', field.label))
-            fieldEl.append(el('span', 'la-card-field-value', field.value))
-            fields.append(fieldEl)
-          }
-          body.append(fields)
-        }
-        if (record.details.length) {
-          for (const detail of record.details) {
-            const detailEl = el('div', 'la-card-detail')
-            detailEl.append(el('div', 'la-card-detail-title', detail.title))
-            detailEl.append(el('div', 'la-card-detail-text', detail.text))
-            body.append(detailEl)
-          }
-        }
-        if (record.rawText && !record.fields.length && !record.details.length) {
-          body.append(el('div', 'la-card-detail-text', record.rawText))
-        }
-        card.append(body)
-      }
-
-      stateContent.append(card)
+        break
     }
   }
 
