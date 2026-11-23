@@ -414,7 +414,7 @@ describe('LumiAtlas frontend host lifecycle', () => {
     ).not.toThrow()
   })
 
-  test('offers three separate sections: Map, States, and Ledger', () => {
+  test('offers three separate sections: Map, States with sidebar, and Ledger', () => {
     const host = createMockHost(win.document as unknown as Document)
     const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
     const browser = host.tabRoot.querySelector('.la-browser') as HTMLElement
@@ -426,9 +426,11 @@ describe('LumiAtlas frontend host lifecycle', () => {
     const scale = browser.querySelector('select[aria-label="Map scale"]') as HTMLSelectElement
     expect(Array.from(scale.options).map(option => option.textContent)).toEqual(['Local', 'Region', 'World'])
     expect(browser.querySelector('select[aria-label="Zone map"]')).not.toBeNull()
-    // States section has category dropdown
-    const category = browser.querySelector('select[aria-label="State category"]') as HTMLSelectElement
-    expect(category.options.length).toBe(7)
+    // States section has sidebar navigation
+    const sidebar = browser.querySelector('.la-sidebar') as HTMLElement
+    expect(sidebar).not.toBeNull()
+    const sidebarItems = sidebar.querySelectorAll('.la-sidebar-item')
+    expect(sidebarItems.length).toBeGreaterThan(10)
     // Ledger section exists
     expect(browser.querySelector('.la-ledger-body')).not.toBeNull()
     teardown()
@@ -456,33 +458,52 @@ describe('LumiAtlas frontend host lifecycle', () => {
         notebook: '<state:notebook><note>&lt;img src=x onerror=alert(1)&gt;</note></state:notebook>',
       } },
     })
-    const categorySelect = host.tabRoot.querySelector('select[aria-label="State category"]') as HTMLSelectElement
-    const statesContent = host.tabRoot.querySelector('.la-state-cards') as HTMLElement
-    expect(statesContent).not.toBeNull()
-    const show = (value: string) => {
-      categorySelect.value = value
-      categorySelect.dispatchEvent(new win.Event('change') as unknown as Event)
+    const sidebar = host.tabRoot.querySelector('.la-sidebar') as HTMLElement
+    const stateContent = host.tabRoot.querySelector('.la-state-content') as HTMLElement
+    expect(stateContent).not.toBeNull()
+    const show = (sectionId: string) => {
+      const item = sidebar.querySelector(`[data-section="${sectionId}"]`) as HTMLElement
+      expect(item).not.toBeNull()
+      item.click()
     }
-    for (const [value, expected] of [
-      ['world-scene', 'Midnight'], ['onscreen-thoughts', 'A private thought'],
-      ['offscreen-agendas', 'Secret errand'], ['profiles-memories', 'Remembers rain'],
-      ['relationships-reputation', 'Trusted'], ['plot-leads', 'Private scheme'],
-      ['inventory-notes', 'One key'],
+    for (const [sectionId, expected] of [
+      ['world', 'Midnight'], ['onscreen', 'Jessie'],
+      ['offscreen_agendas', 'Fox'], ['entityMem', 'Fox'],
+      ['pair', 'Wary'], ['tracks', 'Private scheme'],
+      ['inv', 'One key'],
     ]) {
-      show(value)
-      expect(statesContent.textContent).toContain(expected)
+      show(sectionId)
+      expect(stateContent.textContent).toContain(expected)
     }
-    expect(statesContent.querySelector('img')).toBeNull()
-    expect(statesContent.textContent).toContain('<img src=x onerror=alert(1)>')
-    show('plot-leads')
-    const leads = statesContent.querySelector('[data-state-section="leads"]') as HTMLElement
-    expect(leads.textContent).toContain('Follow the neon sign')
-    expect(leads.textContent).not.toContain('Private scheme')
+    // Expand the offscreen card to verify agenda detail
+    show('offscreen_agendas')
+    const cardHead = stateContent.querySelector('.la-card-head') as HTMLElement
+    expect(cardHead).not.toBeNull()
+    cardHead.click()
+    expect(stateContent.textContent).toContain('Secret errand')
+    // Expand the memory card to verify memory content
+    show('entityMem')
+    const memCardHead = stateContent.querySelector('.la-card-head') as HTMLElement
+    expect(memCardHead).not.toBeNull()
+    memCardHead.click()
+    expect(stateContent.textContent).toContain('Remembers rain')
+    // Expand the notebook card to verify XSS-safe rendering
+    show('notebook')
+    const nbCardHead = stateContent.querySelector('.la-card-head') as HTMLElement
+    expect(nbCardHead).not.toBeNull()
+    nbCardHead.click()
+    expect(stateContent.querySelector('img')).toBeNull()
+    expect(stateContent.textContent).toContain('<img src=x onerror=alert(1)>')
+    show('leads')
+    const leadsCardHead = stateContent.querySelector('.la-card-head') as HTMLElement
+    expect(leadsCardHead).not.toBeNull()
+    leadsCardHead.click()
+    expect(stateContent.textContent).toContain('Follow the neon sign')
+    expect(stateContent.textContent).not.toContain('Private scheme')
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Updated',
       internalState: { sections: { leads: '<state:leads><active_leads><lead>Ask Jessie</lead></active_leads></state:leads>' } } })
-    expect(categorySelect.value).toBe('plot-leads')
-    expect(statesContent.textContent).toContain('Ask Jessie')
-    expect(statesContent.textContent).not.toContain('Private scheme')
+    expect(stateContent.textContent).toContain('Ask Jessie')
+    expect(stateContent.textContent).not.toContain('Private scheme')
     teardown()
   })
 
@@ -536,23 +557,22 @@ describe('LumiAtlas frontend host lifecycle', () => {
     zone.dispatchEvent(new win.Event('change') as unknown as Event)
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Map refreshed', state: atlas })
     expect(zone.value).toBe('archive')
-    const category = host.tabRoot.querySelector('select[aria-label="State category"]') as HTMLSelectElement
-    category.value = 'world-scene'
-    category.dispatchEvent(new win.Event('change') as unknown as Event)
-    const statesContent = host.tabRoot.querySelector('.la-state-cards') as HTMLElement
-    expect(statesContent.textContent).toContain('FIRST CHAT SECRET')
+    const sidebar = host.tabRoot.querySelector('.la-sidebar') as HTMLElement
+    const worldItem = sidebar.querySelector('[data-section="world"]') as HTMLElement
+    worldItem.click()
+    const stateContent = host.tabRoot.querySelector('.la-state-content') as HTMLElement
+    expect(stateContent.textContent).toContain('FIRST CHAT SECRET')
     host.emitEvent('CHAT_SWITCHED', { chatId: 'chat_other' })
-    expect(category.value).toBe('world-scene')
-    expect(statesContent.textContent).toContain('Loading')
-    expect(statesContent.textContent).not.toContain('FIRST CHAT SECRET')
+    expect(stateContent.textContent).toContain('Loading')
+    expect(stateContent.textContent).not.toContain('FIRST CHAT SECRET')
     const switchReq = host.sent[host.sent.length - 1] as { requestId: string; chatId: string }
     expect(switchReq.chatId).toBe('chat_other')
     host.emitBackend(init('uuid-v4-1', 'chat_abc', 'STALE SECRET'))
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Old',
       internalState: { sections: { world: 'STALE SECRET' } } })
-    expect(statesContent.textContent).not.toContain('STALE SECRET')
+    expect(stateContent.textContent).not.toContain('STALE SECRET')
     host.emitBackend(init(switchReq.requestId, 'chat_other', 'SECOND CHAT'))
-    expect(statesContent.textContent).toContain('SECOND CHAT')
+    expect(stateContent.textContent).toContain('SECOND CHAT')
     expect(zone.value).toBe('kabuki_market')
     teardown()
   })
@@ -560,28 +580,28 @@ describe('LumiAtlas frontend host lifecycle', () => {
   test('states provide loading, empty and error feedback without stale data', () => {
     const host = createMockHost(win.document as unknown as Document)
     const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
-    const category = host.tabRoot.querySelector('select[aria-label="State category"]') as HTMLSelectElement
-    category.value = 'world-scene'
-    category.dispatchEvent(new win.Event('change') as unknown as Event)
-    const statesContent = host.tabRoot.querySelector('.la-state-cards') as HTMLElement
-    expect(statesContent.textContent).toContain('Loading states')
+    const sidebar = host.tabRoot.querySelector('.la-sidebar') as HTMLElement
+    const worldItem = sidebar.querySelector('[data-section="world"]') as HTMLElement
+    worldItem.click()
+    const stateContent = host.tabRoot.querySelector('.la-state-content') as HTMLElement
+    expect(stateContent.textContent).toContain('Loading states')
     host.emitBackend({ type: 'init', requestId: 'uuid-v4-1', activeChatId: 'chat_abc',
       config: { enabled: false, autoUpdate: true, connectionId: null, reasoningMode: 'off' },
       connections: [], state: null, busy: false, statusMessage: 'Ready', error: null })
-    expect(statesContent.textContent).toContain('No states available')
+    expect(stateContent.textContent).toContain('No states available')
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
       internalState: { sections: { world: 42 } } })
-    expect(statesContent.textContent).toContain('No data available')
-    expect(statesContent.textContent).not.toContain('42')
+    expect(stateContent.textContent).toContain('No world data available')
+    expect(stateContent.textContent).not.toContain('42')
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
       internalState: { sections: null } })
-    expect(statesContent.textContent).toContain('Unable to load states')
+    expect(stateContent.textContent).toContain('Unable to load states')
     host.emitEvent('CHAT_SWITCHED', { chatId: 'chat_new' })
-    expect(statesContent.textContent).toContain('Loading states')
+    expect(stateContent.textContent).toContain('Loading states')
     host.emitBackend({ type: 'status', chatId: 'chat_new', status: 'error', message: 'Failed to load' })
-    expect(statesContent.textContent).toContain('Unable to load states')
+    expect(stateContent.textContent).toContain('Unable to load states')
     host.emitEvent('CHAT_SWITCHED', { chatId: null })
-    expect(statesContent.textContent).toContain('Open a chat')
+    expect(stateContent.textContent).toContain('Open a chat')
     teardown()
   })
 
@@ -637,24 +657,24 @@ describe('LumiAtlas frontend host lifecycle', () => {
       config: { enabled: true, autoUpdate: true, connectionId: null, reasoningMode: 'off' },
       connections: [], state: null, busy: false, statusMessage: 'Ready', error: null,
       internalState: { sections: { world: `<state:world><time>Morning</time>${secret}</state:world>` } } })
-    const category = host.tabRoot.querySelector('select[aria-label="State category"]') as HTMLSelectElement
-    category.value = 'world-scene'
-    category.dispatchEvent(new win.Event('change') as unknown as Event)
-    const statesContent = host.tabRoot.querySelector('.la-state-cards') as HTMLElement
-    expect(statesContent.textContent).toContain('Morning')
-    expect(statesContent.textContent).not.toContain('PRIVATE LEVEL 99')
+    const sidebar = host.tabRoot.querySelector('.la-sidebar') as HTMLElement
+    const worldItem = sidebar.querySelector('[data-section="world"]') as HTMLElement
+    worldItem.click()
+    const stateContent = host.tabRoot.querySelector('.la-state-content') as HTMLElement
+    expect(stateContent.textContent).toContain('Morning')
+    expect(stateContent.textContent).not.toContain('PRIVATE LEVEL 99')
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
       internalState: { sections: { world: `<state:world><ledger><stats>PRIVATE LEVEL 99</stats></ledger></state:world>` } } })
-    expect(statesContent.textContent).not.toContain('PRIVATE LEVEL 99')
+    expect(stateContent.textContent).not.toContain('PRIVATE LEVEL 99')
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
       internalState: { sections: { world: '<state:world><ledger>PRIVATE LEVEL 99</ledger></state:world>' } } })
-    expect(statesContent.textContent).not.toContain('PRIVATE LEVEL 99')
+    expect(stateContent.textContent).not.toContain('PRIVATE LEVEL 99')
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
       internalState: { sections: { world: '<state:world><ledger>PRIVATE LEVEL 99</ledger></state:world>'.replace('<ledger>', '<ledger:secret xmlns:ledger="urn:ledger">').replace('</ledger>', '</ledger:secret>') } } })
-    expect(statesContent.textContent).not.toContain('PRIVATE LEVEL 99')
+    expect(stateContent.textContent).not.toContain('PRIVATE LEVEL 99')
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
       internalState: { sections: { world: '<state:ledger><stat>PRIVATE LEVEL 99</stat></state:ledger>' } } })
-    expect(statesContent.textContent).not.toContain('PRIVATE LEVEL 99')
+    expect(stateContent.textContent).not.toContain('PRIVATE LEVEL 99')
     teardown()
   })
 
@@ -714,16 +734,16 @@ describe('LumiAtlas frontend host lifecycle', () => {
     host.emitBackend(init)
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
       internalState: { sections: { world: '<state:world><time>sunset</time></state:world>' } } })
-    const category = host.tabRoot.querySelector('select[aria-label="State category"]') as HTMLSelectElement
-    category.value = 'world-scene'
-    category.dispatchEvent(new win.Event('change') as unknown as Event)
-    const statesContent = host.tabRoot.querySelector('.la-state-cards') as HTMLElement
-    expect(statesContent.textContent).toContain('sunset')
+    const sidebar = host.tabRoot.querySelector('.la-sidebar') as HTMLElement
+    const worldItem = sidebar.querySelector('[data-section="world"]') as HTMLElement
+    worldItem.click()
+    const stateContent = host.tabRoot.querySelector('.la-state-content') as HTMLElement
+    expect(stateContent.textContent).toContain('sunset')
     const reload = Array.from(host.tabRoot.querySelectorAll('button')).find(button => button.textContent === 'Reload') as HTMLButtonElement
     reload.click()
     const requestId = (host.sent[host.sent.length - 1] as { requestId: string }).requestId
     host.emitBackend({ ...init, requestId })
-    expect(statesContent.textContent).toContain('sunset')
+    expect(stateContent.textContent).toContain('sunset')
     teardown()
   })
 })

@@ -27,78 +27,87 @@ const STYLES = `
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px;
   height: 100%;
   min-height: 0;
-  color: var(--lumiverse-text, #eef0f7);
-  font-family: var(--lumiverse-font, system-ui, -apple-system, sans-serif);
-  font-size: 13px;
-  line-height: 1.4;
+  color: #e8e4df;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  background: #0f0d0b;
 }
 .la-root * { box-sizing: border-box; }
-.la-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+
+/* ── Header ── */
+.la-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2a2520;
+}
 .la-title-group { display: flex; flex-direction: column; min-width: 0; }
-.la-location { font-size: 15px; font-weight: 700; color: var(--lumiverse-text, #f5f6fb); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.la-subtitle { font-size: 11px; color: var(--lumiverse-text-muted, #9ea5bc); }
-.la-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.la-location { font-size: 13px; font-weight: 700; color: #f0ebe4; }
+.la-subtitle { font-size: 10px; color: #8a8078; }
+.la-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .la-btn {
   appearance: none;
-  border: 1px solid var(--lumiverse-border, #3e4359);
-  background: var(--lumiverse-fill-subtle, #232638);
-  color: var(--lumiverse-text, #eef0f7);
-  border-radius: 8px;
-  padding: 5px 10px;
+  border: 1px solid #3a332a;
+  background: #1a1612;
+  color: #d4ccc0;
+  border-radius: 6px;
+  padding: 3px 8px;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+  transition: border-color 100ms, background 100ms;
 }
-.la-btn:hover:not(:disabled) { border-color: var(--lumiverse-primary, #9b8cff); background: #2c3047; }
-.la-btn:disabled { opacity: 0.48; cursor: not-allowed; }
+.la-btn:hover:not(:disabled) { border-color: #c4973c; background: #252018; }
+.la-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .la-btn[hidden] { display: none; }
-.la-btn-primary { background: var(--lumiverse-primary, #7c6cf6); border-color: var(--lumiverse-primary, #7c6cf6); color: #fff; }
-.la-btn-primary:hover:not(:disabled) { background: #8e7fff; border-color: #8e7fff; }
-.la-btn-danger { border-color: #c75b6b; color: #ffb8c2; }
-.la-btn-icon { padding: 5px 8px; min-width: 28px; text-align: center; }
-.la-btn-active { border-color: var(--lumiverse-primary, #9b8cff); background: rgba(124,108,246,0.22); }
+.la-btn-primary { background: #2a2318; border-color: #c4973c; color: #e8d5a0; }
+.la-btn-primary:hover:not(:disabled) { background: #3a2e20; border-color: #e8b84e; }
+.la-btn-danger { border-color: #8a4040; color: #e89898; }
+.la-btn-icon { padding: 3px 6px; min-width: 24px; text-align: center; }
+.la-btn-active { border-color: #c4973c; background: rgba(196,151,60,0.12); }
 
-.la-settings { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--lumiverse-border, #3e4359); border-radius: 10px; background: var(--lumiverse-fill-subtle, #1e2130); }
+/* ── Settings ── */
+.la-settings { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid #2a2520; border-radius: 8px; background: #14110e; }
 .la-settings[hidden] { display: none; }
-.la-field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; color: var(--lumiverse-text-muted, #aeb4c8); }
-.la-select { width: 100%; padding: 6px 8px; border-radius: 7px; border: 1px solid var(--lumiverse-border, #3e4359); background: #171926; color: var(--lumiverse-text, #eef0f7); font: inherit; font-size: 12px; }
-.la-toggles { display: flex; gap: 14px; flex-wrap: wrap; }
-.la-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--lumiverse-text, #eef0f7); }
-.la-check input { accent-color: var(--lumiverse-primary, #7c6cf6); width: 15px; height: 15px; margin: 0; }
+.la-field { display: flex; flex-direction: column; gap: 3px; font-size: 10px; font-weight: 600; color: #8a8078; }
+.la-select { width: 100%; padding: 4px 6px; border-radius: 5px; border: 1px solid #3a332a; background: #0f0d0b; color: #d4ccc0; font: inherit; font-size: 11px; }
+.la-toggles { display: flex; gap: 10px; flex-wrap: wrap; }
+.la-check { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; cursor: pointer; color: #c4bcb0; }
+.la-check input { accent-color: #c4973c; width: 13px; height: 13px; margin: 0; }
 
-.la-banner { padding: 8px 10px; border-radius: 8px; font-size: 12px; border: 1px solid var(--lumiverse-border, #3e4359); background: #232638; }
+/* ── Banners ── */
+.la-banner { padding: 5px 8px; border-radius: 6px; font-size: 11px; border: 1px solid #3a332a; background: #1a1612; }
 .la-banner[hidden] { display: none; }
-.la-banner-error { border-color: #c75b6b; background: rgba(199,91,107,0.14); color: #ffc8d0; }
-.la-banner-stale { border-color: #d9a441; background: rgba(217,164,65,0.14); color: #ffe3a8; }
+.la-banner-error { border-color: #8a4040; background: rgba(138,64,64,0.1); color: #e8a0a0; }
+.la-banner-stale { border-color: #c4973c; background: rgba(196,151,60,0.08); color: #e8d5a0; }
 
-.la-thinking { border: 1px solid var(--lumiverse-border, #3e4359); border-radius: 10px; background: #191c2b; overflow: hidden; }
+/* ── Thinking ── */
+.la-thinking { border: 1px solid #2a2520; border-radius: 8px; background: #14110e; overflow: hidden; }
 .la-thinking[hidden] { display: none; }
-.la-thinking-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; background: rgba(124,108,246,0.12); border-bottom: 1px solid rgba(255,255,255,0.06); cursor: pointer; user-select: none; }
-.la-thinking-title { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: #dcd6ff; }
-.la-thinking-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lumiverse-primary, #9b8cff); flex: none; }
-.la-thinking-dot.la-pulse { animation: la-pulse-anim 1.2s ease-in-out infinite; }
-@keyframes la-pulse-anim { 0%,100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
-.la-thinking-meta { font-size: 11px; color: var(--lumiverse-text-muted, #9ea5bc); }
-.la-thinking-body { margin: 0; padding: 8px 10px; max-height: 150px; overflow-y: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: #c5cbe3; background: #141724; }
+.la-thinking-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 8px; background: rgba(196,151,60,0.06); border-bottom: 1px solid #2a2520; cursor: pointer; user-select: none; }
+.la-thinking-title { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #d4c4a0; }
+.la-thinking-dot { width: 5px; height: 5px; border-radius: 50%; background: #c4973c; flex: none; }
+.la-thinking-dot.la-pulse { animation: la-pulse 1.2s ease-in-out infinite; }
+@keyframes la-pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+.la-thinking-meta { font-size: 10px; color: #8a8078; }
+.la-thinking-body { margin: 0; padding: 6px 8px; max-height: 100px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 10px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; color: #a09890; background: #0f0d0b; }
 .la-thinking-body[hidden] { display: none; }
 
 /* ── Three-section browser ── */
-.la-browser {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
+.la-browser { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .la-section {
-  border: 1px solid var(--lumiverse-border, #3e4359);
-  border-radius: 12px;
-  background: var(--lumiverse-fill-subtle, #1e2130);
+  border: 1px solid #2a2520;
+  border-radius: 8px;
+  background: #14110e;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -109,29 +118,145 @@ const STYLES = `
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  padding: 8px 10px;
-  background: rgba(124,108,246,0.08);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 5px 8px;
+  background: rgba(196,151,60,0.05);
+  border-bottom: 1px solid #2a2520;
 }
-.la-section-title { font-size: 12px; font-weight: 700; color: #dcd6ff; display: flex; align-items: center; gap: 6px; }
-.la-section-icon { font-size: 14px; }
-.la-section-body { padding: 8px 10px; flex: 1; min-height: 0; overflow-y: auto; }
+.la-section-title { font-size: 11px; font-weight: 700; color: #d4c4a0; display: flex; align-items: center; gap: 5px; }
+.la-section-icon { font-size: 12px; }
+.la-section-body { flex: 1; min-height: 0; overflow-y: auto; }
 
-/* Map section */
-.la-map-section .la-section-body { padding: 0; }
-.la-map-controls { display: flex; gap: 6px; padding: 8px 10px; flex-wrap: wrap; align-items: center; }
-.la-map-controls .la-field { flex: 1; min-width: 100px; }
-.la-canvas-wrap {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  min-height: 200px;
-  max-height: 400px;
-  border-top: 1px solid var(--lumiverse-border, #434861);
+/* ── Status badges ── */
+.la-status-bar {
+  display: flex; gap: 4px; flex-wrap: wrap; padding: 5px 8px;
+  border-bottom: 1px solid #2a2520;
+}
+.la-status-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: 4px;
+  background: #1a1612; border: 1px solid #2a2520;
+  font-size: 10px; color: #b0a898;
+}
+.la-status-badge .la-icon { font-size: 10px; }
+
+/* ── Sidebar + Content layout ── */
+.la-state-layout {
+  display: flex; min-height: 0; flex: 1;
+}
+.la-sidebar {
+  width: 110px; flex: none;
+  border-right: 1px solid #2a2520;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.la-sidebar-category {
+  padding: 4px 8px 2px;
+  font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: #6a6058;
+}
+.la-sidebar-item {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 8px; cursor: pointer;
+  font-size: 11px; color: #a09890;
+  border-left: 2px solid transparent;
+  transition: background 80ms, border-color 80ms;
+}
+.la-sidebar-item:hover { background: rgba(196,151,60,0.06); }
+.la-sidebar-item.la-active {
+  background: rgba(196,151,60,0.1);
+  border-left-color: #c4973c;
+  color: #e8d5a0;
+}
+.la-sidebar-icon { width: 14px; text-align: center; flex: none; font-size: 11px; }
+.la-state-content {
+  flex: 1; min-width: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+/* ── Collapsible cards ── */
+.la-card {
+  margin-bottom: 4px;
+  border: 1px solid #2a2520;
+  border-radius: 6px;
+  background: #1a1612;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 45%, #1d2233 0%, #131622 100%);
-  touch-action: none;
-  user-select: none;
+}
+.la-card-head {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background 80ms;
+}
+.la-card-head:hover { background: rgba(196,151,60,0.04); }
+.la-card-head.la-expanded {
+  border-bottom: 1px solid #2a2520;
+  background: rgba(196,151,60,0.06);
+}
+.la-card-chevron {
+  font-size: 10px; color: #c4973c;
+  transition: transform 100ms;
+  width: 12px; text-align: center;
+}
+.la-card-head.la-expanded .la-card-chevron { transform: rotate(90deg); }
+.la-card-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
+.la-card-name { font-weight: 700; font-size: 11px; color: #e0d8cc; flex: 1; }
+.la-card-badge {
+  font-size: 9px; font-weight: 600;
+  padding: 0 5px; border-radius: 3px;
+  background: #252018; border: 1px solid #3a332a;
+  color: #b0a090;
+}
+.la-card-body { padding: 6px 8px; }
+.la-card-detail {
+  margin-top: 4px;
+  padding: 4px 6px;
+  background: rgba(196,151,60,0.03);
+  border-radius: 4px;
+  border: 1px solid #252018;
+}
+.la-card-detail-title {
+  font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: #8a8078; margin-bottom: 2px;
+}
+.la-card-detail-text { font-size: 11px; color: #c4bcb0; }
+.la-card-fields { display: grid; gap: 2px; }
+.la-card-field { display: flex; gap: 4px; }
+.la-card-field-label { font-weight: 600; color: #8a8078; min-width: 60px; flex: none; font-size: 10px; }
+.la-card-field-value { color: #c4bcb0; font-size: 11px; }
+.la-card-location { font-size: 10px; color: #8a8078; margin-bottom: 4px; }
+
+/* ── Location cards (Rendered style) ── */
+.la-location-card {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 8px; margin-bottom: 3px;
+  border: 1px solid #2a2520; border-radius: 6px;
+  background: #1a1612;
+  border-left: 2px solid #c4973c;
+}
+.la-location-icon { font-size: 12px; }
+.la-location-name { font-weight: 700; font-size: 11px; color: #e0d8cc; flex: 1; }
+.la-location-id { font-family: monospace; font-size: 9px; color: #6a6058; }
+.la-location-badge {
+  font-size: 9px; font-weight: 600;
+  padding: 0 5px; border-radius: 3px;
+  background: rgba(196,151,60,0.1); border: 1px solid #c4973c;
+  color: #d4b44e;
+}
+
+/* ── Map section ── */
+.la-map-controls { display: flex; gap: 4px; padding: 5px 8px; flex-wrap: wrap; align-items: center; }
+.la-map-controls .la-field { flex: 1; min-width: 80px; }
+.la-canvas-wrap {
+  position: relative; width: 100%;
+  aspect-ratio: 4 / 3;
+  min-height: 180px; max-height: 360px;
+  border-top: 1px solid #2a2520;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, #1a1612 0%, #0f0d0b 100%);
+  touch-action: none; user-select: none;
 }
 .la-canvas-wrap.la-dragging { cursor: grabbing; }
 .la-canvas-wrap:not(.la-dragging) { cursor: grab; }
@@ -139,84 +264,78 @@ const STYLES = `
 .la-empty-overlay {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 8px; padding: 20px; text-align: center;
-  color: var(--lumiverse-text-muted, #aeb4c8);
-  background: rgba(19,22,34,0.72);
+  gap: 6px; padding: 16px; text-align: center;
+  color: #8a8078; background: rgba(15,13,11,0.72);
   pointer-events: none;
 }
 .la-empty-overlay[hidden] { display: none; }
-.la-empty-overlay strong { color: var(--lumiverse-text, #eef0f7); font-size: 14px; }
-.la-hud-corner { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; z-index: 2; }
-.la-hud-badge { position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(18,20,30,0.82); border: 1px solid rgba(255,255,255,0.12); color: #dbe0f2; pointer-events: none; }
+.la-empty-overlay strong { color: #d4ccc0; font-size: 12px; }
+.la-hud-corner { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 3px; z-index: 2; }
+.la-hud-badge { position: absolute; left: 6px; top: 6px; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: rgba(15,13,11,0.82); border: 1px solid #2a2520; color: #b0a898; pointer-events: none; }
 
 .la-tile-group { cursor: pointer; }
-.la-tile-rect { transition: filter 120ms ease, stroke-width 120ms ease; }
-.la-tile-group:hover .la-tile-rect { filter: brightness(1.16); }
-.la-tile-selected .la-tile-rect { stroke: #fff !important; stroke-width: 0.75 !important; }
-.la-tile-current .la-tile-rect { stroke: #fde047 !important; stroke-width: 0.7 !important; }
-.la-tile-label { fill: #f7f8fc; font-weight: 700; pointer-events: none; paint-order: stroke; stroke: rgba(14,16,25,0.85); stroke-width: 0.55; stroke-linejoin: round; }
-.la-tile-size { fill: #dbe2ff; font-weight: 600; opacity: 0.88; pointer-events: none; paint-order: stroke; stroke: rgba(14,16,25,0.85); stroke-width: 0.45; }
-.la-pin-label { fill: #fff; font-weight: 700; pointer-events: none; paint-order: stroke; stroke: rgba(11,13,20,0.95); stroke-width: 0.65; stroke-linejoin: round; }
+.la-tile-rect { transition: filter 100ms; }
+.la-tile-group:hover .la-tile-rect { filter: brightness(1.15); }
+.la-tile-selected .la-tile-rect { stroke: #e8d5a0 !important; stroke-width: 0.7 !important; }
+.la-tile-current .la-tile-rect { stroke: #c4973c !important; stroke-width: 0.6 !important; }
+.la-tile-label { fill: #e8e4df; font-weight: 700; pointer-events: none; paint-order: stroke; stroke: rgba(15,13,11,0.85); stroke-width: 0.5; stroke-linejoin: round; }
+.la-tile-size { fill: #b0a898; font-weight: 600; opacity: 0.88; pointer-events: none; paint-order: stroke; stroke: rgba(15,13,11,0.85); stroke-width: 0.4; }
+.la-pin-label { fill: #e8e4df; font-weight: 700; pointer-events: none; paint-order: stroke; stroke: rgba(15,13,11,0.9); stroke-width: 0.6; stroke-linejoin: round; }
 
-.la-map-toolbar { display: flex; align-items: center; gap: 5px; padding: 6px 10px; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,0.06); }
-.la-floors { display: inline-flex; gap: 4px; align-items: center; }
+.la-map-toolbar { display: flex; align-items: center; gap: 3px; padding: 4px 8px; flex-wrap: wrap; border-top: 1px solid #2a2520; }
+.la-floors { display: inline-flex; gap: 3px; align-items: center; }
+.la-inspector { padding: 6px 8px; border-top: 1px solid #2a2520; display: flex; flex-direction: column; gap: 4px; }
+.la-insp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.la-insp-title { font-size: 12px; font-weight: 700; color: #f0ebe4; }
+.la-pill-row { display: flex; gap: 3px; flex-wrap: wrap; }
+.la-pill { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 5px; border-radius: 3px; background: #252018; color: #b0a090; border: 1px solid #3a332a; }
+.la-pill-current { background: rgba(196,151,60,0.12); color: #d4b44e; border-color: #c4973c; }
+.la-pill-locked { background: rgba(244,114,182,0.1); color: #f0a0c0; border-color: #8a4060; }
+.la-insp-summary { margin: 0; font-size: 11px; color: #c4bcb0; }
+.la-insp-section-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6a6058; }
+.la-feature-list { margin: 0; padding-left: 12px; display: grid; gap: 1px; font-size: 11px; color: #b0a898; }
+.la-chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
+.la-pin-chip { display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px; border-radius: 4px; background: #252018; border: 1px solid #3a332a; font-size: 10px; color: #d4ccc0; }
+.la-pin-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
+.la-neighbor-btn { appearance: none; border: 1px solid #3a332a; background: #252018; color: #c4bcb0; border-radius: 4px; padding: 1px 5px; font: inherit; font-size: 10px; cursor: pointer; }
+.la-neighbor-btn:hover { border-color: #c4973c; color: #e8d5a0; }
+.la-notes { font-size: 10px; color: #6a6058; border-top: 1px solid #2a2520; padding-top: 4px; }
 
-.la-inspector { padding: 8px 10px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 6px; }
-.la-insp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.la-insp-title { font-size: 14px; font-weight: 700; color: var(--lumiverse-text, #f5f6fb); }
-.la-pill-row { display: flex; gap: 5px; flex-wrap: wrap; }
-.la-pill { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 999px; background: #2b2f45; color: #cbd2eb; border: 1px solid rgba(255,255,255,0.08); }
-.la-pill-current { background: rgba(250,204,21,0.18); color: #fde68a; border-color: rgba(250,204,21,0.4); }
-.la-pill-locked { background: rgba(244,114,182,0.16); color: #fbcfe8; border-color: rgba(244,114,182,0.35); }
-.la-insp-summary { margin: 0; font-size: 12px; color: var(--lumiverse-text, #dce0f0); }
-.la-insp-section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--lumiverse-text-muted, #98a0b8); }
-.la-feature-list { margin: 0; padding-left: 16px; display: grid; gap: 2px; font-size: 12px; color: #d0d6ec; }
-.la-chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.la-pin-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; background: #262a3d; border: 1px solid rgba(255,255,255,0.1); font-size: 11px; color: #eef0f7; }
-.la-pin-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.la-neighbor-btn { appearance: none; border: 1px solid var(--lumiverse-border, #434861); background: #262a3d; color: #d6dcf5; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 11px; cursor: pointer; }
-.la-neighbor-btn:hover { border-color: var(--lumiverse-primary, #9b8cff); color: #fff; }
-.la-notes { font-size: 11px; color: var(--lumiverse-text-muted, #9ca3bb); border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px; }
-
-/* ── State cards ── */
-.la-state-group { margin-bottom: 10px; }
-.la-state-group:last-child { margin-bottom: 0; }
-.la-state-group-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--lumiverse-text-muted, #98a0b8); margin-bottom: 6px; }
-.la-state-cards { display: grid; gap: 6px; }
-.la-state-card {
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: rgba(255,255,255,0.03);
-}
-.la-state-card-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.la-state-card-name { font-weight: 700; font-size: 12px; color: #e8eaf4; }
-.la-state-card-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: rgba(124,108,246,0.18); color: #c4b5fd; }
-.la-state-card-body { font-size: 12px; color: #c5cbe3; white-space: pre-wrap; overflow-wrap: anywhere; }
-.la-state-field { display: flex; gap: 6px; margin-bottom: 2px; }
-.la-state-field-label { font-weight: 600; color: #9ea5bc; min-width: 70px; flex: none; }
-.la-state-field-value { color: #dce0f0; }
-
-/* ── Ledger panel ── */
-.la-ledger-body { padding: 8px 10px; }
-.la-ledger-empty { color: var(--lumiverse-text-muted, #9ea5bc); font-size: 12px; text-align: center; padding: 12px; }
-.la-ledger-content { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; color: #dce0f0; }
+/* ── Ledger ── */
+.la-ledger-body { padding: 6px 8px; }
+.la-ledger-empty { color: #6a6058; font-size: 11px; text-align: center; padding: 10px; }
+.la-ledger-content { font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; color: #c4bcb0; }
 `
 
 interface Camera { x: number; y: number; w: number; h: number }
 interface StreamPreview { phase: 'thinking' | 'writing'; reasoning: string; outputChars: number; outputTail: string }
 
-const STATE_GROUPS = [
-  { id: 'world-scene', label: 'World & Scene', icon: '🌍', sections: [['world', 'World'], ['locations', 'Locations']] },
-  { id: 'onscreen-thoughts', label: 'Onscreen & Thoughts', icon: '👁', sections: [['onscreen', 'Onscreen'], ['thoughts', 'Thoughts']] },
-  { id: 'offscreen-agendas', label: 'Offscreen Agendas', icon: '🌙', sections: [['offscreen_agendas', 'Offscreen Agendas']] },
-  { id: 'profiles-memories', label: 'Profiles & Memories', icon: '📋', sections: [['entity_state', 'Profiles'], ['entityMem', 'Memories']] },
-  { id: 'relationships-reputation', label: 'Relationships & Reputation', icon: '💞', sections: [['dam', 'Dynamics'], ['pair', 'Relationships'], ['reputation', 'Reputation']] },
-  { id: 'plot-leads', label: 'Plot & Leads', icon: '🧵', sections: [['tracks', 'Tracks'], ['arc', 'Arc'], ['chekhov', 'Story Threads'], ['leads', 'Leads']] },
-  { id: 'inventory-notes', label: 'Inventory & Notes', icon: '🎒', sections: [['inv', 'Inventory'], ['story_notes', 'Story Notes'], ['notebook', 'Notebook'], ['vent', 'Vent']] },
+/* ── State section definitions with icons ── */
+const STATE_SECTIONS = [
+  { id: 'world', label: 'World', icon: '🌍', category: 'Scene', color: '#4e7a8c' },
+  { id: 'onscreen', label: 'On-Screen', icon: '👤', category: 'Scene', color: '#8b5a7c' },
+  { id: 'offscreen_agendas', label: 'Off-Screen', icon: '🌙', category: 'Scene', color: '#c4973c' },
+  { id: 'locations', label: 'Locations', icon: '📍', category: 'Scene', color: '#e86a6a' },
+  { id: 'entityMem', label: 'Memory', icon: '🧠', category: 'People', color: '#e86a8a' },
+  { id: 'entity_state', label: 'Profile', icon: '🪪', category: 'People', color: '#6a8ae8' },
+  { id: 'thoughts', label: 'Thoughts', icon: '💭', category: 'People', color: '#a0a0a0' },
+  { id: 'dam', label: 'Dams', icon: '🪵', category: 'Relationships', color: '#8a6a4a' },
+  { id: 'pair', label: 'Pairs', icon: '💚', category: 'Relationships', color: '#4ade80' },
+  { id: 'reputation', label: 'Reputation', icon: '⭐', category: 'Relationships', color: '#e8c44e' },
+  { id: 'tracks', label: 'Tracks', icon: '🧵', category: 'Plot', color: '#c084fc' },
+  { id: 'arc', label: 'Arc', icon: '📖', category: 'Plot', color: '#fb923c' },
+  { id: 'chekhov', label: 'Chekhov', icon: '🔫', category: 'Plot', color: '#f87171' },
+  { id: 'leads', label: 'Leads', icon: '🔍', category: 'Plot', color: '#60a5fa' },
+  { id: 'inv', label: 'Inventory', icon: '🎒', category: 'Other', color: '#a3a3a3' },
+  { id: 'story_notes', label: 'Story Notes', icon: '📝', category: 'Other', color: '#a3a3a3' },
+  { id: 'notebook', label: 'Notebook', icon: '📓', category: 'Other', color: '#a3a3a3' },
+  { id: 'vent', label: 'Vent', icon: '💨', category: 'Other', color: '#a3a3a3' },
 ] as const
 
-type StateGroupId = (typeof STATE_GROUPS)[number]['id']
+type StateSectionId = (typeof STATE_SECTIONS)[number]['id']
+type StateCategory = 'Scene' | 'People' | 'Relationships' | 'Plot' | 'Other'
+
+const CATEGORIES: StateCategory[] = ['Scene', 'People', 'Relationships', 'Plot', 'Other']
 
 interface InternalSnapshot { sections: Record<string, string>; ledger?: string }
 
@@ -231,7 +350,6 @@ function readInternalSnapshot(raw: unknown): InternalSnapshot | null {
   return { sections, ledger: typeof value.ledger === 'string' ? value.ledger : undefined }
 }
 
-const LEDGER_MARKUP = /(?:<|&lt;)\s*\/?\s*(?:(?:[\w.-]+:)?(?:details|ledger|activation)|ledger:[\w.-]+)\b|ldg-source/i
 const LEDGER_ELEMENT = /^(?:(?:[\w.-]+:)?(?:details|ledger|activation)|ledger:[\w.-]+)$/i
 
 function formatStateText(raw: string, omitLedger = false): string {
@@ -291,56 +409,63 @@ function revealedLedger(raw: string | undefined): string | null {
   }
 }
 
-/* ── Parse state sections into structured cards ── */
-interface StateCard {
+/* ── Parse state section into structured records ── */
+interface StateRecord {
   name: string
   badge?: string
+  location?: string
   fields: Array<{ label: string; value: string }>
+  details: Array<{ title: string; text: string }>
   rawText: string
 }
 
-function parseStateSection(raw: string): StateCard[] {
+function parseStateRecords(raw: string): StateRecord[] {
   const input = raw.trim()
   if (!input) return []
   try {
     const parser = new window.DOMParser()
     const parsed = parser.parseFromString(`<root xmlns:state="urn:lumi-atlas:state">${input}</root>`, 'application/xml')
-    if (parsed.querySelector('parsererror')) return [{ name: 'Raw', fields: [], rawText: input }]
-    const cards: StateCard[] = []
+    if (parsed.querySelector('parsererror')) return [{ name: 'Raw', fields: [], details: [], rawText: input }]
+    const records: StateRecord[] = []
     const root = parsed.documentElement
     const stateEl = Array.from(root.children).find(el => el.tagName.startsWith('state:') && !LEDGER_ELEMENT.test(el.tagName))
     if (!stateEl) {
-      // If the entire state section is a ledger element, return empty
       const anyState = Array.from(root.children).find(el => el.tagName.startsWith('state:'))
       if (anyState && LEDGER_ELEMENT.test(anyState.tagName)) return []
-      return [{ name: 'Raw', fields: [], rawText: input }]
+      return [{ name: 'Raw', fields: [], details: [], rawText: input }]
     }
 
-    const records = Array.from(stateEl.children).filter(el => !LEDGER_ELEMENT.test(el.tagName))
-    if (!records.length) {
-      // Extract text excluding ledger elements
+    const children = Array.from(stateEl.children).filter(el => !LEDGER_ELEMENT.test(el.tagName))
+    if (!children.length) {
       const clone = stateEl.cloneNode(true) as Element
       for (const el of Array.from(clone.querySelectorAll('*'))) {
         if (LEDGER_ELEMENT.test(el.tagName)) el.remove()
       }
       const text = clone.textContent?.trim()
-      return text ? [{ name: stateEl.tagName.replace(/^state:/, ''), fields: [], rawText: text }] : []
+      return text ? [{ name: stateEl.tagName.replace(/^state:/, ''), fields: [], details: [], rawText: text }] : []
     }
 
-    for (const record of records) {
-      const fields: StateCard['fields'] = []
+    for (const record of children) {
+      const fields: StateRecord['fields'] = []
+      const details: StateRecord['details'] = []
       let name = record.tagName.replace(/_/g, ' ')
       let badge: string | undefined
+      let location: string | undefined
 
       for (const child of Array.from(record.children)) {
         if (LEDGER_ELEMENT.test(child.tagName)) continue
         const label = child.tagName.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2')
         const value = child.textContent?.trim() ?? ''
+        if (!value) continue
+
         if (child.tagName === 'name' || child.tagName === 'names' || child.tagName === 'pair') {
           name = value
-        } else if (child.tagName === 'mode' || child.tagName === 'standing' || child.tagName === 'status') {
-          badge = value
-          fields.push({ label, value })
+        } else if (child.tagName === 'loc' || child.tagName === 'location') {
+          location = value
+        } else if (['mode', 'standing', 'status', 'salience', 'sig'].includes(child.tagName)) {
+          badge = child.tagName === 'sig' ? `SIG ${value}` : value
+        } else if (['agenda', 'why', 'goal', 'end', 'move', 'parrott', 'residualMood', 'tfdy'].includes(child.tagName)) {
+          details.push({ title: child.tagName.toUpperCase(), text: value })
         } else {
           fields.push({ label, value })
         }
@@ -350,12 +475,12 @@ function parseStateSection(raw: string): StateCard[] {
         name = record.textContent?.trim()?.slice(0, 40) ?? name
       }
 
-      cards.push({ name, badge, fields, rawText: '' })
+      records.push({ name, badge, location, fields, details, rawText: '' })
     }
 
-    return cards.length ? cards : [{ name: 'Data', fields: [], rawText: formatStateText(input) }]
+    return records.length ? records : [{ name: 'Data', fields: [], details: [], rawText: formatStateText(input) }]
   } catch {
-    return [{ name: 'Raw', fields: [], rawText: input }]
+    return [{ name: 'Raw', fields: [], details: [], rawText: input }]
   }
 }
 
@@ -370,7 +495,8 @@ interface AppState {
   archives: Record<Scale, MapLayer[]>
   selectedLayerId: Record<Scale, string | null>
   scale: Scale
-  stateGroup: StateGroupId
+  stateSection: StateSectionId
+  expandedCards: Set<string>
   floor: number
   selectedTileId: string | null
   busy: boolean
@@ -509,7 +635,8 @@ export function setup(ctx: SpindleFrontendContext) {
     archives: { local: [], region: [], world: [] },
     selectedLayerId: { local: null, region: null, world: null },
     scale: 'local',
-    stateGroup: 'world-scene',
+    stateSection: 'world',
+    expandedCards: new Set(),
     floor: 0,
     selectedTileId: null,
     busy: false,
@@ -547,22 +674,22 @@ export function setup(ctx: SpindleFrontendContext) {
   // Settings
   const settingsBox = el('div', 'la-settings')
   settingsBox.hidden = true
-  const connField = el('label', 'la-field', 'Background Model (Connection)')
+  const connField = el('label', 'la-field', 'Background Model')
   const connSelect = el('select', 'la-select')
   connField.append(connSelect)
   const toggles = el('div', 'la-toggles')
   const enabledLabel = el('label', 'la-check')
   const enabledInput = el('input')
   enabledInput.type = 'checkbox'
-  enabledLabel.append(enabledInput, document.createTextNode('Enable for this chat'))
+  enabledLabel.append(enabledInput, document.createTextNode('Enable'))
   const autoLabel = el('label', 'la-check')
   const autoInput = el('input')
   autoInput.type = 'checkbox'
-  autoLabel.append(autoInput, document.createTextNode('Auto-update after replies'))
+  autoLabel.append(autoInput, document.createTextNode('Auto-update'))
   const reasoningLabel = el('label', 'la-check')
   const reasoningInput = el('input')
   reasoningInput.type = 'checkbox'
-  reasoningLabel.append(reasoningInput, document.createTextNode('Show model thinking'))
+  reasoningLabel.append(reasoningInput, document.createTextNode('Thinking'))
   const refreshBtn = el('button', 'la-btn', 'Reload')
   toggles.append(enabledLabel, autoLabel, reasoningLabel, refreshBtn)
   settingsBox.append(connField, toggles)
@@ -573,7 +700,7 @@ export function setup(ctx: SpindleFrontendContext) {
   const staleBanner = el('div', 'la-banner la-banner-stale')
   staleBanner.hidden = true
 
-  // Thinking panel
+  // Thinking
   const thinkingBox = el('div', 'la-thinking')
   thinkingBox.hidden = true
   const thinkingHead = el('div', 'la-thinking-head')
@@ -587,7 +714,7 @@ export function setup(ctx: SpindleFrontendContext) {
   thinkingBox.append(thinkingHead, thinkingBody)
 
   // ═══════════════════════════════════════════════════════
-  // THREE SEPARATE SECTIONS: Map | States | Ledger
+  // THREE SECTIONS: Map | States | Ledger
   // ═══════════════════════════════════════════════════════
   const browser = el('div', 'la-browser')
 
@@ -623,7 +750,7 @@ export function setup(ctx: SpindleFrontendContext) {
   const zoomOutBtn = el('button', 'la-btn la-btn-icon', '−')
   zoomOutBtn.title = 'Zoom out'
   const fitBtn = el('button', 'la-btn la-btn-icon', 'Fit')
-  fitBtn.title = 'Fit map to view'
+  fitBtn.title = 'Fit map'
   hudCorner.append(zoomOutBtn, zoomInBtn, fitBtn)
   const emptyOverlay = el('div', 'la-empty-overlay')
   canvasWrap.append(svg, hudBadge, hudCorner, emptyOverlay)
@@ -645,22 +772,35 @@ export function setup(ctx: SpindleFrontendContext) {
   const statesSection = el('div', 'la-section')
   const statesHead = el('div', 'la-section-head')
   const statesTitle = el('div', 'la-section-title')
-  statesTitle.append(el('span', 'la-section-icon', '📊'), el('span', undefined, 'States'))
+  statesTitle.append(el('span', 'la-section-icon', '📊'), el('span', undefined, 'Internal States'))
   statesHead.append(statesTitle)
 
-  const stateGroupField = el('label', 'la-field', 'Category')
-  const stateGroupSelect = el('select', 'la-select')
-  stateGroupSelect.setAttribute('aria-label', 'State category')
-  for (const group of STATE_GROUPS) {
-    const opt = el('option', undefined, `${group.icon} ${group.label}`)
-    opt.value = group.id
-    stateGroupSelect.append(opt)
-  }
-  stateGroupField.append(stateGroupSelect)
+  // Status badges bar (time, date, location, weather from world state)
+  const statusBar = el('div', 'la-status-bar')
 
+  // Sidebar + content layout
+  const stateLayout = el('div', 'la-state-layout')
+  const sidebar = el('div', 'la-sidebar')
+  const stateContent = el('div', 'la-state-content')
+
+  // Build sidebar categories
+  for (const category of CATEGORIES) {
+    const sections = STATE_SECTIONS.filter(s => s.category === category)
+    if (!sections.length) continue
+    sidebar.append(el('div', 'la-sidebar-category', category))
+    for (const section of sections) {
+      const item = el('div', 'la-sidebar-item')
+      item.setAttribute('data-section', section.id)
+      const icon = el('span', 'la-sidebar-icon', section.icon)
+      icon.style.color = section.color
+      item.append(icon, el('span', undefined, section.label))
+      sidebar.append(item)
+    }
+  }
+
+  stateLayout.append(sidebar, stateContent)
   const statesBody = el('div', 'la-section-body')
-  const statesContent = el('div', 'la-state-cards')
-  statesBody.append(stateGroupField, statesContent)
+  statesBody.append(statusBar, stateLayout)
   statesSection.append(statesHead, statesBody)
 
   // ── Section 3: LEDGER ──
@@ -984,70 +1124,116 @@ export function setup(ctx: SpindleFrontendContext) {
     }
   }
 
-  // ── Render: State cards ──
-  function renderStateCards(): void {
-    statesContent.replaceChildren()
+  // ── Render: Status badges ──
+  function renderStatusBar(): void {
+    statusBar.replaceChildren()
+    if (!state.internalState) return
+    const world = state.internalState.sections.world ?? ''
+    // Extract time, date, location, weather from world section
+    const extract = (tag: string): string => {
+      const match = world.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i'))
+      return match?.[1]?.trim() ?? ''
+    }
+    const time = extract('time')
+    const date = extract('date')
+    const loc = extract('loc')
+    const weather = extract('weather')
+    if (time) statusBar.append(el('span', 'la-status-badge', `🕐 ${time}`))
+    if (date) statusBar.append(el('span', 'la-status-badge', `📅 ${date}`))
+    if (loc) statusBar.append(el('span', 'la-status-badge', `📍 ${loc}`))
+    if (weather) statusBar.append(el('span', 'la-status-badge', weather))
+  }
+
+  // ── Render: State content with collapsible cards ──
+  function renderStateContent(): void {
+    stateContent.replaceChildren()
     if (!state.activeChatId) {
-      statesContent.append(el('p', 'la-subtitle', 'Open a chat to view states.'))
+      stateContent.append(el('p', 'la-subtitle', 'Open a chat to view states.'))
       return
     }
     if (state.internalLoading) {
-      statesContent.append(el('p', 'la-subtitle', 'Loading states…'))
+      stateContent.append(el('p', 'la-subtitle', 'Loading states…'))
       return
     }
     if (state.internalInvalid || (state.error && !state.internalState)) {
-      statesContent.append(el('p', 'la-subtitle', 'Unable to load states.'))
+      stateContent.append(el('p', 'la-subtitle', 'Unable to load states.'))
       return
     }
     if (!state.internalState) {
-      statesContent.append(el('p', 'la-subtitle', 'No states available for this chat.'))
+      stateContent.append(el('p', 'la-subtitle', 'No states available for this chat.'))
       return
     }
 
-    const group = STATE_GROUPS.find(g => g.id === state.stateGroup)
-    if (!group) return
+    const section = STATE_SECTIONS.find(s => s.id === state.stateSection)
+    if (!section) return
 
-    for (const [sectionKey, sectionLabel] of group.sections) {
-      const raw = state.internalState.sections[sectionKey] ?? ''
-      if (!raw.trim()) {
-        const emptyGroup = el('div', 'la-state-group')
-        emptyGroup.append(el('div', 'la-state-group-title', sectionLabel))
-        const emptyCard = el('div', 'la-state-card')
-        emptyCard.append(el('div', 'la-state-card-body', 'No data available.'))
-        emptyGroup.append(emptyCard)
-        statesContent.append(emptyGroup)
-        continue
-      }
-
-      const groupEl = el('div', 'la-state-group')
-      groupEl.setAttribute('data-state-section', sectionKey)
-      groupEl.append(el('div', 'la-state-group-title', sectionLabel))
-
-      const cards = parseStateSection(raw)
-      for (const card of cards) {
-        const cardEl = el('div', 'la-state-card')
-        const headerEl = el('div', 'la-state-card-header')
-        headerEl.append(el('span', 'la-state-card-name', card.name))
-        if (card.badge) headerEl.append(el('span', 'la-state-card-badge', card.badge))
-        cardEl.append(headerEl)
-
-        if (card.fields.length) {
-          const bodyEl = el('div', 'la-state-card-body')
-          for (const field of card.fields) {
-            const fieldEl = el('div', 'la-state-field')
-            fieldEl.append(el('span', 'la-state-field-label', field.label))
-            fieldEl.append(el('span', 'la-state-field-value', field.value))
-            bodyEl.append(fieldEl)
-          }
-          cardEl.append(bodyEl)
-        } else if (card.rawText) {
-          cardEl.append(el('div', 'la-state-card-body', card.rawText))
-        }
-
-        groupEl.append(cardEl)
-      }
-      statesContent.append(groupEl)
+    const raw = state.internalState.sections[section.id] ?? ''
+    if (!raw.trim()) {
+      stateContent.append(el('p', 'la-subtitle', `No ${section.label.toLowerCase()} data available.`))
+      return
     }
+
+    const records = parseStateRecords(raw)
+    for (const record of records) {
+      const cardId = `${section.id}:${record.name}`
+      const isExpanded = state.expandedCards.has(cardId)
+
+      const card = el('div', 'la-card')
+      const head = el('div', `la-card-head${isExpanded ? ' la-expanded' : ''}`)
+      const chevron = el('span', 'la-card-chevron', isExpanded ? '▾' : '▸')
+      const dot = el('span', 'la-card-dot')
+      dot.style.background = section.color
+      const name = el('span', 'la-card-name', record.name)
+      head.append(chevron, dot, name)
+      if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
+      card.append(head)
+
+      if (isExpanded) {
+        const body = el('div', 'la-card-body')
+        if (record.location) {
+          body.append(el('div', 'la-card-location', `→ ${record.location}`))
+        }
+        if (record.fields.length) {
+          const fields = el('div', 'la-card-fields')
+          for (const field of record.fields) {
+            const fieldEl = el('div', 'la-card-field')
+            fieldEl.append(el('span', 'la-card-field-label', field.label))
+            fieldEl.append(el('span', 'la-card-field-value', field.value))
+            fields.append(fieldEl)
+          }
+          body.append(fields)
+        }
+        if (record.details.length) {
+          for (const detail of record.details) {
+            const detailEl = el('div', 'la-card-detail')
+            detailEl.append(el('div', 'la-card-detail-title', detail.title))
+            detailEl.append(el('div', 'la-card-detail-text', detail.text))
+            body.append(detailEl)
+          }
+        }
+        if (record.rawText && !record.fields.length && !record.details.length) {
+          body.append(el('div', 'la-card-detail-text', record.rawText))
+        }
+        card.append(body)
+      }
+
+      head.addEventListener('click', () => {
+        if (state.expandedCards.has(cardId)) state.expandedCards.delete(cardId)
+        else state.expandedCards.add(cardId)
+        renderStateContent()
+      })
+
+      stateContent.append(card)
+    }
+  }
+
+  // ── Render: Sidebar active state ──
+  function renderSidebar(): void {
+    const items = sidebar.querySelectorAll('.la-sidebar-item')
+    items.forEach(item => {
+      const sectionId = (item as HTMLElement).getAttribute('data-section')
+      item.classList.toggle('la-active', sectionId === state.stateSection)
+    })
   }
 
   // ── Render: Ledger ──
@@ -1174,12 +1360,11 @@ export function setup(ctx: SpindleFrontendContext) {
     roadsToggle.classList.toggle('la-btn-active', state.showRoads)
     labelsToggle.classList.toggle('la-btn-active', state.showLabels)
 
-    // State group selector
-    stateGroupSelect.value = state.stateGroup
-
     renderMapSvg()
     renderInspector()
-    renderStateCards()
+    renderStatusBar()
+    renderSidebar()
+    renderStateContent()
     renderLedger()
   }
 
@@ -1222,11 +1407,15 @@ export function setup(ctx: SpindleFrontendContext) {
 
   on(thinkingHead, 'click', () => { state.thinkingOpen = !state.thinkingOpen; renderAll() })
 
-  on(stateGroupSelect, 'change', () => {
-    const group = STATE_GROUPS.find(g => g.id === stateGroupSelect.value)
-    if (!group) return
-    state.stateGroup = group.id
-    renderAll()
+  // Sidebar navigation
+  sidebar.addEventListener('click', (ev) => {
+    const item = (ev.target as HTMLElement).closest('.la-sidebar-item')
+    if (!item) return
+    const sectionId = item.getAttribute('data-section') as StateSectionId | null
+    if (!sectionId) return
+    state.stateSection = sectionId
+    renderSidebar()
+    renderStateContent()
   })
 
   on(zoneSelect, 'change', () => {
