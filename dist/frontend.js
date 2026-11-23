@@ -438,6 +438,17 @@ var STYLES = `
 /* ── Notebook entries ── */
 .la-notebook-entry .la-card-body { padding: 4px 8px; }
 
+/* ── Vexa GFX rendered content ── */
+.la-vexa-gfx { min-width: 0; }
+.la-vexa-gfx details { margin-bottom: 4px; }
+.la-vexa-gfx summary { cursor: pointer; }
+.la-vexa-gfx .ist-wrap { font-size: 0.92em; }
+.la-vexa-gfx .ist-wrap .ist-panel { padding: 4px; }
+.la-vexa-gfx .ist-wrap .ist-card { margin-bottom: 3px; }
+.la-vexa-gfx .ist-wrap .ist-badge { font-size: 0.75em; }
+.la-vexa-gfx .ist-wrap .ist-k { font-weight: 600; color: var(--ist-muted, #8a8078); }
+.la-vexa-gfx .ist-wrap .ist-v { color: var(--ist-text, #c4bcb0); }
+
 /* ── Location cards (Rendered style) ── */
 .la-location-card {
   display: flex; align-items: center; gap: 6px;
@@ -621,6 +632,50 @@ function revealedLedger(raw) {
   } catch {
     return null;
   }
+}
+var cachedRegexScripts = null;
+var regexFetchPromise = null;
+async function fetchDisplayRegexes(ctx) {
+  if (cachedRegexScripts)
+    return cachedRegexScripts;
+  if (regexFetchPromise)
+    return regexFetchPromise;
+  regexFetchPromise = (async () => {
+    try {
+      const reqId = `la_regex_${Date.now()}`;
+      return await new Promise((resolve) => {
+        const handler = (raw) => {
+          const msg = raw;
+          if (msg.type === "regex_scripts" && msg.requestId === reqId) {
+            resolve(msg.scripts ?? []);
+            cachedRegexScripts = msg.scripts ?? [];
+          }
+        };
+        const unsub = ctx.onBackendMessage(handler);
+        ctx.sendToBackend({ type: "get_regex_scripts", requestId: reqId });
+        setTimeout(() => {
+          unsub();
+          resolve([]);
+        }, 2000);
+      });
+    } catch {
+      return [];
+    } finally {
+      regexFetchPromise = null;
+    }
+  })();
+  return regexFetchPromise;
+}
+function applyRegexScripts(input, scripts) {
+  let result = input;
+  const sorted = [...scripts].sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const script of sorted) {
+    try {
+      const re = new RegExp(script.findRegex, script.flags);
+      result = result.replace(re, script.replaceString);
+    } catch {}
+  }
+  return result;
 }
 var refreshStateContent = () => {};
 function renderFlatList(raw, container, sectionColor) {
@@ -1631,6 +1686,11 @@ ${tile.summary}` : ""}`;
       stateContent.append(el("p", "la-subtitle", `No ${section.label.toLowerCase()} data available.`));
       return;
     }
+    const vexaRendered = renderWithVexaRegex(raw, section.id);
+    if (vexaRendered) {
+      stateContent.append(vexaRendered);
+      return;
+    }
     switch (section.id) {
       case "pair":
         renderPairMetrics(raw, stateContent);
@@ -1654,6 +1714,21 @@ ${tile.summary}` : ""}`;
           renderFlatList(raw, stateContent, section.color);
         }
         break;
+    }
+  }
+  function renderWithVexaRegex(raw, sectionId) {
+    if (!cachedRegexScripts || cachedRegexScripts.length === 0)
+      return null;
+    try {
+      const html = applyRegexScripts(raw, cachedRegexScripts);
+      if (html === raw)
+        return null;
+      const wrapper = document.createElement("div");
+      wrapper.className = "la-vexa-gfx";
+      wrapper.innerHTML = html;
+      return wrapper;
+    } catch {
+      return null;
     }
   }
   function renderSidebar() {
@@ -2060,6 +2135,9 @@ ${state.stream.outputTail}`;
   });
   renderAll();
   requestInit();
+  setTimeout(() => {
+    fetchDisplayRegexes(ctx);
+  }, 100);
   return () => {
     state.destroyed = true;
     for (const off of cleanups)

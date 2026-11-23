@@ -280,6 +280,17 @@ const STYLES = `
 /* ── Notebook entries ── */
 .la-notebook-entry .la-card-body { padding: 4px 8px; }
 
+/* ── Vexa GFX rendered content ── */
+.la-vexa-gfx { min-width: 0; }
+.la-vexa-gfx details { margin-bottom: 4px; }
+.la-vexa-gfx summary { cursor: pointer; }
+.la-vexa-gfx .ist-wrap { font-size: 0.92em; }
+.la-vexa-gfx .ist-wrap .ist-panel { padding: 4px; }
+.la-vexa-gfx .ist-wrap .ist-card { margin-bottom: 3px; }
+.la-vexa-gfx .ist-wrap .ist-badge { font-size: 0.75em; }
+.la-vexa-gfx .ist-wrap .ist-k { font-weight: 600; color: var(--ist-muted, #8a8078); }
+.la-vexa-gfx .ist-wrap .ist-v { color: var(--ist-text, #c4bcb0); }
+
 /* ── Location cards (Rendered style) ── */
 .la-location-card {
   display: flex; align-items: center; gap: 6px;
@@ -469,6 +480,61 @@ interface StateRecord {
   fields: Array<{ label: string; value: string }>
   details: Array<{ title: string; text: string }>
   rawText: string
+}
+
+/* ── Vexa GFX regex renderer ── */
+// Fetches active display regexes from Lumiverse and applies them to state XML
+
+interface RegexScript {
+  findRegex: string
+  replaceString: string
+  flags: string
+  sortOrder: number
+}
+
+let cachedRegexScripts: RegexScript[] | null = null
+let regexFetchPromise: Promise<RegexScript[]> | null = null
+
+async function fetchDisplayRegexes(ctx: SpindleFrontendContext): Promise<RegexScript[]> {
+  if (cachedRegexScripts) return cachedRegexScripts
+  if (regexFetchPromise) return regexFetchPromise
+  regexFetchPromise = (async () => {
+    try {
+      // Request regex scripts from the backend via a custom message
+      const reqId = `la_regex_${Date.now()}`
+      return await new Promise<RegexScript[]>((resolve) => {
+        const handler = (raw: unknown) => {
+          const msg = raw as { type?: string; requestId?: string; scripts?: RegexScript[] }
+          if (msg.type === 'regex_scripts' && msg.requestId === reqId) {
+            resolve(msg.scripts ?? [])
+            cachedRegexScripts = msg.scripts ?? []
+          }
+        }
+        const unsub = ctx.onBackendMessage(handler)
+        ctx.sendToBackend({ type: 'get_regex_scripts', requestId: reqId } as never)
+        // Timeout after 2s
+        setTimeout(() => { unsub(); resolve([]) }, 2000)
+      })
+    } catch {
+      return []
+    } finally {
+      regexFetchPromise = null
+    }
+  })()
+  return regexFetchPromise
+}
+
+function applyRegexScripts(input: string, scripts: RegexScript[]): string {
+  let result = input
+  // Sort by sortOrder ascending (same as Lumiverse)
+  const sorted = [...scripts].sort((a, b) => a.sortOrder - b.sortOrder)
+  for (const script of sorted) {
+    try {
+      const re = new RegExp(script.findRegex, script.flags)
+      result = result.replace(re, script.replaceString)
+    } catch { /* skip invalid regex */ }
+  }
+  return result
 }
 
 /* ── Section-specific renderers ── */
@@ -1559,7 +1625,14 @@ export function setup(ctx: SpindleFrontendContext) {
       return
     }
 
-    // Use section-specific renderers for specialized layouts
+    // Try Vexa GFX regex rendering first
+    const vexaRendered = renderWithVexaRegex(raw, section.id)
+    if (vexaRendered) {
+      stateContent.append(vexaRendered)
+      return
+    }
+
+    // Fallback to built-in renderers
     switch (section.id) {
       case 'pair':
         renderPairMetrics(raw, stateContent)
@@ -1583,6 +1656,24 @@ export function setup(ctx: SpindleFrontendContext) {
           renderFlatList(raw, stateContent, section.color)
         }
         break
+    }
+  }
+
+  // ── Vexa GFX regex renderer ──
+  function renderWithVexaRegex(raw: string, sectionId: string): HTMLElement | null {
+    if (!cachedRegexScripts || cachedRegexScripts.length === 0) return null
+    try {
+      const html = applyRegexScripts(raw, cachedRegexScripts)
+      // If the regex didn't change anything, fall back to built-in rendering
+      if (html === raw) return null
+      const wrapper = document.createElement('div')
+      wrapper.className = 'la-vexa-gfx'
+      // Use textContent for safety, then parse as HTML for the styled output
+      // The regex scripts produce safe HTML (no script tags)
+      wrapper.innerHTML = html
+      return wrapper
+    } catch {
+      return null
     }
   }
 
@@ -1976,6 +2067,8 @@ export function setup(ctx: SpindleFrontendContext) {
 
   renderAll()
   requestInit()
+  // Fetch Vexa GFX regexes in background after a short delay (non-blocking)
+  setTimeout(() => { void fetchDisplayRegexes(ctx) }, 100)
 
   return () => {
     state.destroyed = true

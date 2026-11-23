@@ -915,6 +915,21 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
       cancelRuntime(rt, 'Atlas update cancelled.', origin)
       return
     }
+
+    if ((msg as { type?: string }).type === 'get_regex_scripts') {
+      // Return active display regex scripts for Vexa GFX rendering
+      const requestId = (msg as { requestId?: string }).requestId
+      try {
+        const scripts: Array<{ findRegex: string; replaceString: string; flags: string; sortOrder: number }> = []
+        // The spindle API doesn't expose regex_scripts directly, but we can try to read them
+        // For now, return an empty array — the frontend will fall back to built-in rendering
+        // In a future version, we can add a spindle.regex.list() call when available
+        sendToUI(userId, { type: 'regex_scripts', requestId, scripts } as never, origin)
+      } catch {
+        sendToUI(userId, { type: 'regex_scripts', requestId, scripts: [] } as never, origin)
+      }
+      return
+    }
   } catch (err) {
     spindle.log.error(`LumiAtlas message handler error: ${err instanceof Error ? err.message : String(err)}`)
     emitStatus(
