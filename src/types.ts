@@ -99,6 +99,8 @@ export interface ChatConfig {
   autoUpdate: boolean
 }
 
+import type { InternalState } from './internal-state.js'
+
 export interface UserConfig {
   connectionId: string | null
   reasoningMode?: 'inherit' | 'off'
@@ -116,6 +118,9 @@ export interface StoredChatRecord {
   config: ChatConfig
   state: AtlasState
   archives: Record<Scale, MapLayer[]>
+  internalState?: InternalState
+  sourceRevision?: { id: string; role: string; swipe_id: number; content: string }
+  processedGenerationId?: string
 }
 
 export type BackendToFrontendMessage =
@@ -127,6 +132,7 @@ export type BackendToFrontendMessage =
       connections: ConnectionOption[]
       state: AtlasState | null
       archives?: Record<Scale, MapLayer[]>
+      internalState?: InternalState
       busy: boolean
       statusMessage: string
       error: string | null
@@ -138,6 +144,7 @@ export type BackendToFrontendMessage =
       message: string
       state?: AtlasState | null
       archives?: Record<Scale, MapLayer[]>
+      internalState?: InternalState
       config?: EffectiveConfig
     }
   | {

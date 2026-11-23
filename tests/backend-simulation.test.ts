@@ -1,0 +1,95 @@
+import { beforeAll, expect, test } from 'bun:test'
+
+type Obj = Record<string, any>
+const events = new Map<string, Array<(payload: any, userId?: string) => any>>()
+const outbound: any[] = []
+const writes = new Map<string, any>()
+const requests: any[] = []
+const user = 'test-user'
+const chat = 'test-chat'
+let frontend: ((payload: unknown, userId: string, sessionId?: string) => Promise<void>) | undefined
+let interceptor: ((messages: any[], context: any) => Promise<any>) | undefined
+let messages: any[] = [
+  { id:'u1', role:'user', content:'I enter the shop.', swipe_id:0, hidden:false },
+  { id:'a1', role:'assistant', swipe_id:0, hidden:false, content:'A clerk waves. <internal_states><state:world><time>morning</time><loc>Shop</loc></state:world><state:inv><inv>tools</inv></state:inv></internal_states>' },
+]
+let release: (() => void) | undefined
+let waitForRelease = false
+const configKey = 'lumi-atlas-v1/config.json'
+const chatKey = 'lumi-atlas-v1/chats/test-chat.json'
+const mock: Obj = {
+  host:{capabilities:{}},
+  permissions:{has:()=>true,onChanged:()=>()=>{}},
+  userStorage:{
+    getJson:async(path:string, options:Obj)=>writes.has(path) ? structuredClone(writes.get(path)) : options.fallback,
+    setJson:async(path:string, value:unknown)=>{ writes.set(path,structuredClone(value)) },
+  },
+  connections:{list:async()=>[{id:'sidecar',name:'Background',model:'sidecar-model',provider:'custom'}]},
+  chats:{getActive:async()=>({id:chat}),get:async(id:string, uid:string)=>id===chat&&uid===user?{id:chat}:null},
+  chat:{getMessages:async()=>structuredClone(messages)},
+  generate:{rawStream:async function* (request:Obj){
+    requests.push(request)
+    if(waitForRelease) await new Promise<void>(resolve=>{release=resolve})
+    yield {type:'done',content:JSON.stringify({statePatch:{world:{fields:{time:'noon'}}},mapPatch:{}}),finish_reason:'stop'}
+  }},
+  on:(name:string, fn:any)=>{ const a=events.get(name)??[]; a.push(fn); events.set(name,a); return ()=>{} },
+  onFrontendMessage:(fn:any)=>{frontend=fn},
+  registerInterceptor:(fn:any)=>{interceptor=fn;return()=>{}},
+  sendToFrontend:(payload:any)=>{outbound.push(payload)},
+  log:{info:()=>{},warn:()=>{},error:()=>{}},
+}
+function emit(name:string, payload:unknown){ for(const fn of events.get(name)??[]) fn(payload,user) }
+async function waitUntil(predicate:()=>boolean){ for(let i=0;i<200;i++){if(predicate()) return; await Bun.sleep(5)} throw new Error('Timed out waiting for simulation result: '+JSON.stringify(outbound.slice(-3))) }
+
+beforeAll(async()=>{
+  ;(globalThis as Obj).spindle=mock
+  writes.set(configKey,{connectionId:'sidecar',reasoningMode:'off'})
+  await import('../src/backend.js')
+})
+
+test('enabling the extension runs one sidecar call on a successful new assistant reply and preserves the seed', async()=>{
+  expect(frontend).toBeDefined()
+  await frontend!({type:'init',requestId:'1',chatId:chat},user)
+  const init = outbound.find(x=>x.type==='init')
+  expect(init.config.enabled).toBe(true)
+  expect(interceptor).toBeDefined()
+  emit('GENERATION_STARTED',{chatId:chat,generationId:'g1',generationType:'normal'})
+  emit('GENERATION_ENDED',{chatId:chat,generationId:'g1',generationType:'normal',messageId:'a1'})
+  await waitUntil(()=>outbound.some(x=>x.type==='status'&&x.status==='ready'&&x.internalState))
+  expect(requests).toHaveLength(1)
+  expect(requests[0].userId).toBe(user)
+  expect(requests[0].connection_id).toBe('sidecar')
+  expect(requests[0].messages.map((m:any)=>m.content).join('\n')).toContain('statePatch')
+  const saved=writes.get(chatKey)
+  expect(saved.internalState.sections.world).toContain('<time>noon</time>')
+  expect(saved.internalState.sections.inv).toContain('<inv>tools</inv>')
+  const interception = await interceptor!([{role:'user',content:'Please continue.'}],{userId:user,chatId:chat})
+  const prepared = Array.isArray(interception) ? interception : interception.messages
+  expect(JSON.stringify(prepared)).toContain('Please continue.')
+  expect(messages[1].content).toContain('<time>morning</time>')
+})
+
+test('pausing a chat stops both automatic simulation and prompt interception', async()=>{
+  await frontend!({type:'set_chat_config',chatId:chat,enabled:false},user)
+  const prompt = [{role:'user',content:'Please continue.'}]
+  const interception = await interceptor!(prompt,{userId:user,chatId:chat})
+  expect(interception).toBe(prompt)
+  emit('GENERATION_STARTED',{chatId:chat,generationId:'g-disabled',generationType:'normal'})
+  emit('GENERATION_ENDED',{chatId:chat,generationId:'g-disabled',generationType:'normal',messageId:'a1'})
+  await Bun.sleep(30)
+  expect(requests).toHaveLength(1)
+  await frontend!({type:'set_chat_config',chatId:chat,enabled:true},user)
+})
+
+test('a changed or deleted source during the model call cannot overwrite the saved simulation', async()=>{
+  const saved=structuredClone(writes.get(chatKey))
+  messages.push({id:'u2',role:'user',content:'I leave.',swipe_id:0,hidden:false},{id:'a2',role:'assistant',content:'You leave.',swipe_id:0,hidden:false})
+  waitForRelease=true
+  emit('GENERATION_STARTED',{chatId:chat,generationId:'g2',generationType:'normal'})
+  emit('GENERATION_ENDED',{chatId:chat,generationId:'g2',generationType:'normal',messageId:'a2'})
+  await waitUntil(()=>Boolean(release))
+  messages[messages.length-1].content='This reply was edited.'
+  release!()
+  await waitUntil(()=>outbound.some(x=>x.type==='status'&&x.status==='stale'))
+  expect(writes.get(chatKey).internalState).toEqual(saved.internalState)
+})

@@ -341,27 +341,40 @@ var STYLES = `
   gap: 8px;
   flex-wrap: wrap;
 }
-.la-scale-tabs {
-  display: inline-flex;
+.la-browser-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+.la-browser-nav .la-field { min-width: 0; }
+.la-browser-nav .la-field:last-child { grid-column: 1 / -1; }
+.la-browser-nav select:disabled { opacity: 0.55; }
+.la-browser-nav select { min-height: 40px; }
+@media (min-width: 500px) {
+  .la-browser-nav .la-field:last-child { grid-column: auto; }
+}
+.la-toolbar[hidden], .la-canvas-wrap[hidden], .la-inspector[hidden] { display: none; }
+.la-state-panel {
   border: 1px solid var(--lumiverse-border, #3e4359);
-  border-radius: 8px;
-  overflow: hidden;
-  background: #191c29;
+  border-radius: 10px;
+  background: var(--lumiverse-fill-subtle, #1e2130);
+  padding: 10px 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
-.la-scale-tab {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--lumiverse-text-muted, #aeb4c8);
-  padding: 5px 11px;
+.la-state-panel[hidden] { display: none; }
+.la-state-section + .la-state-section {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.la-state-text {
+  margin: 5px 0 0;
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.la-scale-tab[aria-selected="true"] {
-  background: var(--lumiverse-primary, #7c6cf6);
-  color: #fff;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--lumiverse-text, #dce0f0);
 }
 .la-layer-tools {
   display: flex;
@@ -413,30 +426,6 @@ var STYLES = `
 .la-empty-overlay strong {
   color: var(--lumiverse-text, #eef0f7);
   font-size: 14px;
-}
-.la-layer-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.la-layer-bar[hidden] { display: none; }
-.la-layer-bar-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--lumiverse-text-muted, #aeb4c8);
-  white-space: nowrap;
-}
-.la-layer-select {
-  flex: 1 1 160px;
-  min-width: 140px;
-  padding: 5px 8px;
-  border-radius: 7px;
-  border: 1px solid var(--lumiverse-border, #3e4359);
-  background: #171926;
-  color: var(--lumiverse-text, #eef0f7);
-  font: inherit;
-  font-size: 12px;
 }
 .la-thinking {
   border: 1px solid var(--lumiverse-border, #3e4359);
@@ -664,6 +653,112 @@ var STYLES = `
   padding-top: 6px;
 }
 `;
+var STATE_VIEWS = [
+  ["map", "Map"],
+  ["world-scene", "World & Scene"],
+  ["onscreen-thoughts", "Onscreen & Thoughts"],
+  ["offscreen-agendas", "Offscreen Agendas"],
+  ["profiles-memories", "Profiles & Memories"],
+  ["relationships-reputation", "Relationships & Reputation"],
+  ["plot-leads", "Plot & Leads"],
+  ["inventory-notes", "Inventory & Notes"],
+  ["ledger", "Ledger"]
+];
+var STATE_GROUPS = {
+  "world-scene": [["world", "World"], ["locations", "Locations"]],
+  "onscreen-thoughts": [["onscreen", "Onscreen"], ["thoughts", "Thoughts"]],
+  "offscreen-agendas": [["offscreen_agendas", "Offscreen agendas"]],
+  "profiles-memories": [["entity_state", "Profiles"], ["entityMem", "Memories"]],
+  "relationships-reputation": [["dam", "Dynamics"], ["pair", "Relationships"], ["reputation", "Reputation"]],
+  "plot-leads": [["tracks", "Tracks"], ["arc", "Arc"], ["chekhov", "Story threads"], ["leads", "Player-facing leads"]],
+  "inventory-notes": [["inv", "Inventory"], ["story_notes", "Story notes"], ["notebook", "Notebook"], ["vent", "Vent"]]
+};
+function readInternalSnapshot(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    return null;
+  const value = raw;
+  if (!value.sections || typeof value.sections !== "object" || Array.isArray(value.sections))
+    return null;
+  const sections = Object.create(null);
+  for (const [key, content] of Object.entries(value.sections)) {
+    if (typeof content === "string")
+      sections[key] = content;
+  }
+  return { sections, ledger: typeof value.ledger === "string" ? value.ledger : undefined };
+}
+var LEDGER_MARKUP = /(?:<|&lt;)\s*\/?\s*(?:(?:[\w.-]+:)?(?:details|ledger|activation)|ledger:[\w.-]+)\b|ldg-source/i;
+var LEDGER_ELEMENT = /^(?:(?:[\w.-]+:)?(?:details|ledger|activation)|ledger:[\w.-]+)$/i;
+function formatStateText(raw, omitLedger = false) {
+  const input = raw.trim();
+  if (!input || /<!\s*(?:DOCTYPE|ENTITY)/i.test(input))
+    return input;
+  try {
+    const parser = new window.DOMParser;
+    const parsed = parser.parseFromString(`<root xmlns:state="urn:lumi-atlas:state">${input}</root>`, "application/xml");
+    if (parsed.querySelector("parsererror"))
+      return input;
+    const lines = [];
+    const walk = (node, depth) => {
+      if (omitLedger && LEDGER_ELEMENT.test(node.tagName))
+        return;
+      const label = node.tagName.replace(/^state:/, "").replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2");
+      const children = Array.from(node.children);
+      const indent = "  ".repeat(depth);
+      if (!children.length) {
+        const text = node.textContent?.trim();
+        if (text)
+          lines.push(`${indent}${label}: ${text}`);
+        return;
+      }
+      lines.push(`${indent}${label}:`);
+      for (const child of children)
+        walk(child, depth + 1);
+    };
+    const root = parsed.documentElement;
+    const elements = Array.from(root.children);
+    if (!elements.length)
+      return root.textContent?.trim() ?? input;
+    for (const node of elements) {
+      if (omitLedger && LEDGER_ELEMENT.test(node.tagName))
+        continue;
+      if (node.tagName.startsWith("state:")) {
+        for (const child of Array.from(node.children))
+          walk(child, 0);
+        if (!node.children.length && node.textContent?.trim())
+          lines.push(node.textContent.trim());
+      } else {
+        walk(node, 0);
+      }
+    }
+    return lines.join(`
+`) || "";
+  } catch {
+    return input;
+  }
+}
+function revealedLedger(raw) {
+  if (!raw?.trim() || /<!\s*(?:DOCTYPE|ENTITY)/i.test(raw))
+    return null;
+  try {
+    const parsed = new window.DOMParser().parseFromString(`<root>${raw}</root>`, "application/xml");
+    if (parsed.querySelector("parsererror"))
+      return null;
+    const top = Array.from(parsed.documentElement.children);
+    if (top.length !== 1)
+      return null;
+    const ledger = top[0];
+    if (ledger.tagName !== "details" || !ledger.classList.contains("ldg-source"))
+      return null;
+    if (ledger.getElementsByTagName("details").length)
+      return null;
+    const activations = Array.from(ledger.getElementsByTagName("activation"));
+    if (activations.length !== 1 || activations[0].children.length || activations[0].textContent?.trim() !== "REVEALED")
+      return null;
+    return formatStateText(raw);
+  } catch {
+    return null;
+  }
+}
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className)
@@ -790,9 +885,13 @@ function setup(ctx) {
     config: { enabled: false, autoUpdate: true, connectionId: null, reasoningMode: "inherit" },
     connections: [],
     atlas: null,
+    internalState: null,
+    internalLoading: true,
+    internalInvalid: false,
     archives: { local: [], region: [], world: [] },
     selectedLayerId: { local: null, region: null, world: null },
     scale: "local",
+    view: "map",
     floor: 0,
     selectedTileId: null,
     busy: false,
@@ -858,32 +957,38 @@ function setup(ctx) {
   thinkingHead.append(thinkingTitle, thinkingMeta);
   const thinkingBody = el("pre", "la-thinking-body", "");
   thinkingBox.append(thinkingHead, thinkingBody);
-  const toolbar = el("div", "la-toolbar");
-  const scaleTabs = el("div", "la-scale-tabs");
-  scaleTabs.setAttribute("role", "tablist");
-  const scaleButtons = {
-    local: el("button", "la-scale-tab", "Local"),
-    region: el("button", "la-scale-tab", "Region"),
-    world: el("button", "la-scale-tab", "World")
-  };
-  for (const s of ["local", "region", "world"]) {
-    scaleButtons[s].type = "button";
-    scaleButtons[s].setAttribute("role", "tab");
-    scaleTabs.append(scaleButtons[s]);
+  const browserNav = el("div", "la-browser-nav");
+  const viewField = el("label", "la-field", "States view");
+  const viewSelect = el("select", "la-select");
+  viewSelect.setAttribute("aria-label", "States view");
+  for (const [value, label] of STATE_VIEWS) {
+    const option = el("option", undefined, label);
+    option.value = value;
+    viewSelect.append(option);
   }
+  viewField.append(viewSelect);
+  const scaleField = el("label", "la-field", "Map scale");
+  const scaleSelect = el("select", "la-select");
+  scaleSelect.setAttribute("aria-label", "Map scale");
+  for (const [value, label] of [["local", "Local"], ["region", "Region"], ["world", "World"]]) {
+    const option = el("option", undefined, label);
+    option.value = value;
+    scaleSelect.append(option);
+  }
+  scaleField.append(scaleSelect);
+  const layerField = el("label", "la-field", "Zone map");
+  const layerSelect = el("select", "la-select la-layer-select");
+  layerSelect.setAttribute("aria-label", "Zone map");
+  layerField.append(layerSelect);
+  browserNav.append(viewField, scaleField, layerField);
+  const toolbar = el("div", "la-toolbar");
   const layerTools = el("div", "la-layer-tools");
   const floorBar = el("div", "la-floors");
   const pinsToggle = el("button", "la-btn la-btn-active", "Pins");
   const roadsToggle = el("button", "la-btn la-btn-active", "Roads");
   const labelsToggle = el("button", "la-btn la-btn-active", "Labels");
   layerTools.append(floorBar, pinsToggle, roadsToggle, labelsToggle);
-  toolbar.append(scaleTabs, layerTools);
-  const layerBar = el("div", "la-layer-bar");
-  layerBar.hidden = true;
-  const layerBarLabel = el("span", "la-layer-bar-label", "Zone");
-  const layerSelect = el("select", "la-layer-select");
-  layerSelect.setAttribute("aria-label", "Select generated map tileset");
-  layerBar.append(layerBarLabel, layerSelect);
+  toolbar.append(layerTools);
   const canvasWrap = el("div", "la-canvas-wrap");
   const svg = svgEl("svg", {
     class: "la-svg",
@@ -902,7 +1007,10 @@ function setup(ctx) {
   const emptyOverlay = el("div", "la-empty-overlay");
   canvasWrap.append(svg, hudBadge, hudCorner, emptyOverlay);
   const inspector = el("div", "la-inspector");
-  root.append(header, settingsBox, errorBanner, staleBanner, thinkingBox, toolbar, layerBar, canvasWrap, inspector);
+  const statePanel = el("section", "la-state-panel");
+  statePanel.setAttribute("aria-live", "polite");
+  statePanel.hidden = true;
+  root.append(header, settingsBox, errorBanner, staleBanner, thinkingBox, browserNav, toolbar, canvasWrap, inspector, statePanel);
   tab.root.replaceChildren(root);
   function send(msg) {
     if (state.destroyed)
@@ -931,6 +1039,13 @@ function setup(ctx) {
       }
     }
     return result;
+  }
+  function reconcileSelectedLayers() {
+    for (const scale of ["local", "region", "world"]) {
+      const id = state.selectedLayerId[scale];
+      if (id && !availableLayers(scale).some((layer) => layer.id === id))
+        state.selectedLayerId[scale] = null;
+    }
   }
   function currentLayer() {
     const active = state.atlas?.maps?.[state.scale] ?? null;
@@ -1317,6 +1432,47 @@ ${tile.summary}` : ""}`;
       inspector.append(el("div", "la-notes", state.atlas.notes.join(" · ")));
     }
   }
+  function renderStatePanel() {
+    statePanel.replaceChildren();
+    statePanel.hidden = state.view === "map";
+    if (state.view === "map")
+      return;
+    const title = STATE_VIEWS.find(([value]) => value === state.view)?.[1] ?? "States";
+    statePanel.setAttribute("aria-label", title);
+    statePanel.append(el("div", "la-insp-title", title));
+    if (!state.activeChatId) {
+      statePanel.append(el("p", "la-subtitle", "Open a chat to view its states."));
+      return;
+    }
+    if (state.internalLoading) {
+      statePanel.append(el("p", "la-subtitle", "Loading states…"));
+      return;
+    }
+    if (state.internalInvalid || state.error && !state.internalState) {
+      statePanel.append(el("p", "la-subtitle", "Unable to load states."));
+      return;
+    }
+    if (!state.internalState) {
+      statePanel.append(el("p", "la-subtitle", "No states available for this chat."));
+      return;
+    }
+    if (state.view === "ledger") {
+      const content = revealedLedger(state.internalState.ledger);
+      statePanel.append(content ? el("pre", "la-state-text", content) : el("p", "la-subtitle", "No revealed Ledger available."));
+      return;
+    }
+    for (const [key, label] of STATE_GROUPS[state.view]) {
+      const section = el("section", "la-state-section");
+      section.setAttribute("data-state-section", key);
+      section.append(el("div", "la-insp-section-label", label));
+      const raw = state.internalState.sections[key] ?? "";
+      const containsLedger = LEDGER_MARKUP.test(raw);
+      const content = formatStateText(raw, true);
+      const unsafeFallback = containsLedger && LEDGER_MARKUP.test(content);
+      section.append(el("pre", "la-state-text", unsafeFallback ? "Ledger-like content omitted; check the Ledger view." : content || "No data available."));
+      statePanel.append(section);
+    }
+  }
   function renderAll() {
     if (state.destroyed)
       return;
@@ -1382,22 +1538,25 @@ ${state.stream.outputTail}`;
         thinkingBody.scrollTop = thinkingBody.scrollHeight;
       }
     }
-    for (const s of ["local", "region", "world"]) {
-      const count = state.atlas?.maps?.[s]?.tiles.length ?? 0;
-      const label = s === "local" ? "Local" : s === "region" ? "Region" : "World";
-      scaleButtons[s].textContent = count > 0 ? `${label} (${count})` : label;
-      scaleButtons[s].setAttribute("aria-selected", String(state.scale === s));
-    }
+    viewSelect.value = state.view;
+    scaleSelect.value = state.scale;
+    const showMap = state.view === "map";
+    scaleSelect.disabled = !showMap;
+    toolbar.hidden = !showMap;
+    canvasWrap.hidden = !showMap;
+    inspector.hidden = !showMap;
     const layers = availableLayers(state.scale);
-    const showLayerDropdown = (state.scale === "local" || state.scale === "region") && layers.length > 0;
-    layerBar.hidden = !showLayerDropdown;
-    if (showLayerDropdown) {
-      layerBarLabel.textContent = state.scale === "local" ? "Local Zone" : "Region";
-      layerSelect.replaceChildren();
+    layerSelect.disabled = !showMap || layers.length === 0;
+    layerSelect.replaceChildren();
+    if (!layers.length) {
+      const empty = el("option", undefined, "No maps available");
+      empty.value = "";
+      layerSelect.append(empty);
+    } else {
       const activeId = state.atlas?.maps?.[state.scale]?.id ?? null;
       for (const l of layers) {
         const isCurrent = l.id === activeId;
-        const opt = el("option", undefined, `${l.name} (${l.tiles.length} tiles)${isCurrent ? " · Current" : ""}`);
+        const opt = el("option", undefined, `${l.name} (${l.tiles.length} ${l.tiles.length === 1 ? "tile" : "tiles"})${isCurrent ? " · Current" : ""}`);
         opt.value = l.id;
         layerSelect.append(opt);
       }
@@ -1426,6 +1585,7 @@ ${state.stream.outputTail}`;
     labelsToggle.classList.toggle("la-btn-active", state.showLabels);
     renderMapSvg();
     renderInspector();
+    renderStatePanel();
   }
   const on = (target, type, handler) => {
     target.addEventListener(type, handler);
@@ -1476,8 +1636,17 @@ ${state.stream.outputTail}`;
     state.thinkingOpen = !state.thinkingOpen;
     renderAll();
   });
+  on(viewSelect, "change", () => {
+    const view = STATE_VIEWS.find(([value]) => value === viewSelect.value);
+    if (!view)
+      return;
+    state.view = view[0];
+    renderAll();
+  });
   on(layerSelect, "change", () => {
     const picked = layerSelect.value || null;
+    if (!picked || !availableLayers(state.scale).some((layer) => layer.id === picked))
+      return;
     const activeId = state.atlas?.maps?.[state.scale]?.id ?? null;
     state.selectedLayerId[state.scale] = picked === activeId ? null : picked;
     const layer = currentLayer();
@@ -1517,18 +1686,17 @@ ${state.stream.outputTail}`;
       return;
     send({ type: "cancel", chatId: state.activeChatId });
   });
-  for (const s of ["local", "region", "world"]) {
-    on(scaleButtons[s], "click", () => {
-      if (state.scale === s)
-        return;
-      state.scale = s;
-      const layer = currentLayer();
-      state.selectedTileId = layer?.currentTileId ?? null;
-      state.floor = layer?.activeFloor ?? 0;
-      fitCamera(true);
-      renderAll();
-    });
-  }
+  on(scaleSelect, "change", () => {
+    const scale = scaleSelect.value;
+    if (scale !== "local" && scale !== "region" && scale !== "world" || state.scale === scale)
+      return;
+    state.scale = scale;
+    const layer = currentLayer();
+    state.selectedTileId = layer?.currentTileId ?? null;
+    state.floor = layer?.activeFloor ?? 0;
+    fitCamera(true);
+    renderAll();
+  });
   on(pinsToggle, "click", () => {
     state.showPins = !state.showPins;
     renderAll();
@@ -1591,13 +1759,20 @@ ${state.stream.outputTail}`;
     if (msg.type === "init") {
       if (pendingRequestId && msg.requestId && msg.requestId !== pendingRequestId)
         return;
+      if (msg.activeChatId !== state.activeChatId)
+        return;
       pendingRequestId = null;
       state.activeChatId = msg.activeChatId;
       state.config = msg.config;
       state.connections = msg.connections;
       state.atlas = msg.state;
+      if (msg.internalState !== undefined) {
+        state.internalState = readInternalSnapshot(msg.internalState);
+        state.internalInvalid = msg.internalState !== null && !state.internalState;
+      }
+      state.internalLoading = false;
       state.archives = msg.archives ?? { local: [], region: [], world: [] };
-      state.selectedLayerId = { local: null, region: null, world: null };
+      reconcileSelectedLayers();
       state.busy = msg.busy;
       if (!msg.busy)
         state.stream = null;
@@ -1605,14 +1780,19 @@ ${state.stream.outputTail}`;
       state.error = msg.error;
       if (!msg.config.connectionId)
         state.settingsOpen = true;
-      state.floor = msg.state?.maps?.[state.scale]?.activeFloor ?? 0;
-      state.selectedTileId = msg.state?.maps?.[state.scale]?.currentTileId ?? null;
-      fitCamera(true);
+      const layer = currentLayer();
+      const validFloors = layer ? getFloors(layer) : [];
+      if (!validFloors.includes(state.floor))
+        state.floor = layer?.activeFloor ?? 0;
+      if (!layer?.tiles.some((tile) => tile.id === state.selectedTileId)) {
+        state.selectedTileId = layer?.currentTileId ?? null;
+      }
+      fitCamera(false);
       renderAll();
       return;
     }
     if (msg.type === "stream") {
-      if (msg.chatId && state.activeChatId && msg.chatId !== state.activeChatId)
+      if (!state.activeChatId || msg.chatId !== state.activeChatId)
         return;
       state.busy = true;
       state.stream = {
@@ -1625,21 +1805,29 @@ ${state.stream.outputTail}`;
       return;
     }
     if (msg.type === "status") {
-      if (msg.chatId && state.activeChatId && msg.chatId !== state.activeChatId)
+      if (msg.chatId && msg.chatId !== state.activeChatId)
         return;
+      if (msg.internalState !== undefined) {
+        state.internalState = readInternalSnapshot(msg.internalState);
+        state.internalInvalid = msg.internalState !== null && !state.internalState;
+        state.internalLoading = false;
+      }
+      if (msg.status === "error")
+        state.internalLoading = false;
       if (msg.config)
         state.config = msg.config;
       if (msg.archives)
         state.archives = msg.archives;
       if (msg.state !== undefined) {
         state.atlas = msg.state;
-        if (msg.status === "ready") {
-          state.selectedLayerId = { local: null, region: null, world: null };
-        }
-        if (msg.state && !state.selectedTileId) {
-          state.selectedTileId = msg.state.maps[state.scale]?.currentTileId ?? null;
+        reconcileSelectedLayers();
+        const layer = currentLayer();
+        if (!layer?.tiles.some((tile) => tile.id === state.selectedTileId)) {
+          state.selectedTileId = layer?.currentTileId ?? null;
         }
       }
+      if (msg.archives && msg.state === undefined)
+        reconcileSelectedLayers();
       state.busy = msg.status === "updating";
       state.statusMessage = msg.message;
       state.error = msg.status === "error" ? msg.message : null;
@@ -1650,7 +1838,7 @@ ${state.stream.outputTail}`;
         } else if (state.stream) {
           state.thinkingOpen = false;
         }
-        fitCamera(true);
+        fitCamera(false);
       } else if (msg.status === "updating") {
         tab.setBadge("…");
       } else if (msg.status === "stale") {
@@ -1665,11 +1853,17 @@ ${state.stream.outputTail}`;
     const nextId = payload && typeof payload === "object" && typeof payload.chatId === "string" ? payload.chatId : null;
     state.activeChatId = nextId;
     state.atlas = null;
+    state.internalState = null;
+    state.internalLoading = !!nextId;
+    state.internalInvalid = false;
     state.archives = { local: [], region: [], world: [] };
     state.selectedLayerId = { local: null, region: null, world: null };
     state.selectedTileId = null;
     state.busy = false;
     state.stream = null;
+    thinkingBody.textContent = "";
+    state.floor = 0;
+    tab.setBadge(null);
     state.error = null;
     state.statusMessage = nextId ? "Loading Atlas…" : "Open a chat to view its Atlas.";
     state.cameraScaleKey = "";

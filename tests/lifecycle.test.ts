@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { Window } from 'happy-dom'
-import type { AtlasState, BackendToFrontendMessage } from '../src/types.js'
+import type { AtlasState } from '../src/types.js'
 import { setup } from '../src/frontend.js'
 
 function makeSampleState(chatId = 'chat_abc'): AtlasState {
@@ -167,6 +167,7 @@ function createMockHost(doc: Document) {
   let styleRemoved = false
   let tabDestroyed = false
   let uuidCalls = 0
+  let activeChatId: string | null = 'chat_abc'
 
   const ctx = {
     host: {
@@ -222,7 +223,7 @@ function createMockHost(doc: Document) {
       },
       emit: () => {},
     },
-    getActiveChat: () => ({ chatId: 'chat_abc', characterId: 'char_1' }),
+    getActiveChat: () => ({ chatId: activeChatId, characterId: 'char_1' }),
     sendToBackend: (payload: unknown) => {
       sent.push(payload)
     },
@@ -236,10 +237,14 @@ function createMockHost(doc: Document) {
     ctx,
     tabRoot,
     sent,
-    emitBackend: (msg: BackendToFrontendMessage) => {
+    emitBackend: (msg: unknown) => {
       for (const fn of backendListeners) fn(msg)
     },
     emitEvent: (event: string, payload: unknown) => {
+      if (event === 'CHAT_SWITCHED') {
+        const chatId = (payload as { chatId?: unknown } | null)?.chatId
+        activeChatId = typeof chatId === 'string' ? chatId : null
+      }
       for (const fn of eventListeners.get(event) ?? []) fn(payload)
     },
     getBadge: () => badge,
@@ -342,7 +347,7 @@ describe('LumiAtlas frontend host lifecycle', () => {
     layerSelect.value = 'apartment_local'
     layerSelect.dispatchEvent(new win.Event('change') as unknown as Event)
     expect(host.tabRoot.textContent).toContain('Bedroom')
-    layerSelect.value = 'kabuki_market_local'
+    layerSelect.value = 'kabuki_market'
     layerSelect.dispatchEvent(new win.Event('change') as unknown as Event)
 
     // Live stream thinking preview renders reasoning tokens
@@ -359,11 +364,10 @@ describe('LumiAtlas frontend host lifecycle', () => {
     expect(thinkingBox.textContent).toContain('Charting Kabuki Market exits and pins...')
 
     // Switch to World scale and verify region tiles + off-screen character pin
-    const worldBtn = Array.from(host.tabRoot.querySelectorAll('.la-scale-tab')).find(
-      (b) => b.textContent?.trim().startsWith('World'),
-    ) as HTMLButtonElement | undefined
-    expect(worldBtn).toBeDefined()
-    worldBtn!.click()
+    const scaleSelect = host.tabRoot.querySelector('select[aria-label="Map scale"]') as HTMLSelectElement
+    expect(scaleSelect).not.toBeNull()
+    scaleSelect.value = 'world'
+    scaleSelect.dispatchEvent(new win.Event('change') as unknown as Event)
 
     expect(host.tabRoot.textContent).toContain('Watson')
     expect(host.tabRoot.textContent).toContain('Westbrook')
@@ -408,5 +412,326 @@ describe('LumiAtlas frontend host lifecycle', () => {
         message: 'Late message',
       }),
     ).not.toThrow()
+  })
+
+  test('offers three labelled state browser dropdowns without duplicate scale tabs', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    const browser = host.tabRoot.querySelector('.la-browser-nav') as HTMLElement
+    expect(browser).not.toBeNull()
+    expect(browser.querySelectorAll('select')).toHaveLength(3)
+    const view = browser.querySelector('select[aria-label="States view"]') as HTMLSelectElement
+    expect(Array.from(view.options).map(option => option.textContent)).toEqual([
+      'Map', 'World & Scene', 'Onscreen & Thoughts', 'Offscreen Agendas',
+      'Profiles & Memories', 'Relationships & Reputation', 'Plot & Leads',
+      'Inventory & Notes', 'Ledger',
+    ])
+    const scale = browser.querySelector('select[aria-label="Map scale"]') as HTMLSelectElement
+    expect(Array.from(scale.options).map(option => option.textContent)).toEqual(['Local', 'Region', 'World'])
+    expect(browser.querySelector('select[aria-label="Zone map"]')).not.toBeNull()
+    expect(host.tabRoot.querySelector('[role="tablist"]')).toBeNull()
+    teardown()
+  })
+
+  test('browses each group of internal state without executing markup or inventing leads', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    host.emitBackend({
+      type: 'init', requestId: 'uuid-v4-1', activeChatId: 'chat_abc',
+      config: { enabled: true, autoUpdate: true, connectionId: 'conn_terra', reasoningMode: 'inherit' },
+      connections: [], state: makeSampleState(), busy: false, statusMessage: 'Ready', error: null,
+      internalState: { sections: {
+        world: '<state:world><time>Midnight</time><weather>Rain</weather></state:world>',
+        onscreen: '<state:onscreen><ent_on><name>Jessie</name><agenda>Waiting</agenda></ent_on></state:onscreen>',
+        thoughts: '<state:thoughts><ent_think><name>Jessie</name><tQ1>A private thought</tQ1></ent_think></state:thoughts>',
+        offscreen_agendas: '<state:offscreen_agendas><ent_off><name>Fox</name><agenda>Secret errand</agenda></ent_off></state:offscreen_agendas>',
+        entity_state: '<state:entity_state><ent_col><name>Fox</name><look>Silver coat</look></ent_col></state:entity_state>',
+        entityMem: '<state:entityMem><ent_mem><name>Fox</name><mem>Remembers rain</mem></ent_mem></state:entityMem>',
+        pair: '<state:pair><pair><names>Fox and Jessie</names><mode>Wary</mode></pair></state:pair>',
+        reputation: '<state:reputation><ent_rep><standing>Trusted</standing></ent_rep></state:reputation>',
+        tracks: '<state:tracks><track>Private scheme</track></state:tracks>',
+        leads: '<state:leads><active_leads><lead>Follow the neon sign</lead></active_leads></state:leads>',
+        inv: '<state:inv><inv>One key</inv></state:inv>',
+        notebook: '<state:notebook><note>&lt;img src=x onerror=alert(1)&gt;</note></state:notebook>',
+      } },
+    })
+    const view = host.tabRoot.querySelector('select[aria-label="States view"]') as HTMLSelectElement
+    const panel = host.tabRoot.querySelector('.la-state-panel') as HTMLElement
+    expect(panel).not.toBeNull()
+    const show = (value: string) => {
+      view.value = value
+      view.dispatchEvent(new win.Event('change') as unknown as Event)
+      expect(panel.hidden).toBe(false)
+      expect((host.tabRoot.querySelector('.la-canvas-wrap') as HTMLElement).hidden).toBe(true)
+    }
+    for (const [value, expected] of [
+      ['world-scene', 'Midnight'], ['onscreen-thoughts', 'A private thought'],
+      ['offscreen-agendas', 'Secret errand'], ['profiles-memories', 'Remembers rain'],
+      ['relationships-reputation', 'Trusted'], ['plot-leads', 'Private scheme'],
+      ['inventory-notes', 'One key'],
+    ]) {
+      show(value)
+      expect(panel.textContent).toContain(expected)
+    }
+    expect(panel.querySelector('img')).toBeNull()
+    expect(panel.textContent).toContain('<img src=x onerror=alert(1)>')
+    show('plot-leads')
+    const leads = panel.querySelector('[data-state-section="leads"]') as HTMLElement
+    expect(leads.textContent).toContain('Follow the neon sign')
+    expect(leads.textContent).not.toContain('Private scheme')
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Updated',
+      internalState: { sections: { leads: '<state:leads><active_leads><lead>Ask Jessie</lead></active_leads></state:leads>' } } })
+    expect(view.value).toBe('plot-leads')
+    expect(panel.textContent).toContain('Ask Jessie')
+    expect(panel.textContent).not.toContain('Private scheme')
+    teardown()
+  })
+
+  test('shows Ledger data only after an unambiguous explicit REVEALED activation', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    host.emitBackend({ type: 'init', requestId: 'uuid-v4-1', activeChatId: 'chat_abc',
+      config: { enabled: true, autoUpdate: true, connectionId: null, reasoningMode: 'off' },
+      connections: [], state: null, busy: false, statusMessage: 'Ready', error: null,
+      internalState: { sections: {} } })
+    const view = host.tabRoot.querySelector('select[aria-label="States view"]') as HTMLSelectElement
+    view.value = 'ledger'
+    view.dispatchEvent(new win.Event('change') as unknown as Event)
+    const panel = host.tabRoot.querySelector('.la-state-panel') as HTMLElement
+    const update = (ledger: string) => host.emitBackend({
+      type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
+      internalState: { sections: {}, ledger },
+    })
+    for (const ledger of [
+      '<details class="ldg-source"><activation>DORMANT</activation><stat>Secret 97</stat></details>',
+      '<details class="ldg-source"><stat>Secret 97</stat></details>',
+      '<details class="ldg-source"><!-- <activation>REVEALED</activation> --><stat>Secret 97</stat></details>',
+      '<details class="ldg-source"><activation>REVEALED later</activation><stat>Secret 97</stat></details>',
+      '<details class="ldg-source"><activation>REVEALED</activation><activation>DORMANT</activation><stat>Secret 97</stat></details>',
+      '<details class="ldg-source"><activation>REVEALED</activation><stat>Secret 97',
+      '<bundle><details class="ldg-source"><activation>REVEALED</activation><stat>Allowed</stat></details><details class="ldg-source"><stat>Secret 97</stat></details></bundle>',
+    ]) {
+      update(ledger)
+      expect(panel.textContent).not.toContain('Secret 97')
+      expect(panel.textContent).toContain('No revealed Ledger')
+    }
+    update('<details class="ldg-source"><activation>REVEALED</activation><stat>Level 3</stat><note>&lt;img src=x onerror=alert(1)&gt;</note></details>')
+    expect(panel.textContent).toContain('Level 3')
+    expect(panel.textContent).toContain('<img src=x onerror=alert(1)>')
+    expect(panel.querySelector('img')).toBeNull()
+    teardown()
+  })
+
+  test('preserves selections on refresh and clears private data during a chat switch', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    const atlas = makeSampleState()
+    const archive = { ...atlas.maps.local, id: 'archive', name: 'Archived Zone' }
+    const init = (requestId: string | null, chatId: string, text: string) => ({
+      type: 'init' as const, requestId, activeChatId: chatId,
+      config: { enabled: true, autoUpdate: true, connectionId: 'conn', reasoningMode: 'inherit' as const },
+      connections: [], state: makeSampleState(chatId),
+      archives: { local: [archive], region: [], world: [] }, busy: false, statusMessage: 'Ready', error: null,
+      internalState: { sections: { world: `<state:world><time>${text}</time></state:world>` } },
+    })
+    host.emitBackend(init('uuid-v4-1', 'chat_abc', 'FIRST CHAT SECRET'))
+    const zone = host.tabRoot.querySelector('select[aria-label="Zone map"]') as HTMLSelectElement
+    zone.value = 'archive'
+    zone.dispatchEvent(new win.Event('change') as unknown as Event)
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Map refreshed', state: atlas })
+    expect(zone.value).toBe('archive')
+    const view = host.tabRoot.querySelector('select[aria-label="States view"]') as HTMLSelectElement
+    view.value = 'world-scene'
+    view.dispatchEvent(new win.Event('change') as unknown as Event)
+    const panel = host.tabRoot.querySelector('.la-state-panel') as HTMLElement
+    expect(panel.textContent).toContain('FIRST CHAT SECRET')
+    host.emitEvent('CHAT_SWITCHED', { chatId: 'chat_other' })
+    expect(view.value).toBe('world-scene')
+    expect(panel.textContent).toContain('Loading')
+    expect(panel.textContent).not.toContain('FIRST CHAT SECRET')
+    const switchReq = host.sent[host.sent.length - 1] as { requestId: string; chatId: string }
+    expect(switchReq.chatId).toBe('chat_other')
+    host.emitBackend(init('uuid-v4-1', 'chat_abc', 'STALE SECRET'))
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Old',
+      internalState: { sections: { world: 'STALE SECRET' } } })
+    expect(panel.textContent).not.toContain('STALE SECRET')
+    host.emitBackend(init(switchReq.requestId, 'chat_other', 'SECOND CHAT'))
+    expect(panel.textContent).toContain('SECOND CHAT')
+    view.value = 'map'
+    view.dispatchEvent(new win.Event('change') as unknown as Event)
+    expect(zone.value).toBe('kabuki_market')
+    teardown()
+  })
+
+  test('states provide loading, empty and error feedback without stale data', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    const view = host.tabRoot.querySelector('select[aria-label="States view"]') as HTMLSelectElement
+    view.value = 'world-scene'
+    view.dispatchEvent(new win.Event('change') as unknown as Event)
+    const panel = host.tabRoot.querySelector('.la-state-panel') as HTMLElement
+    expect(panel.textContent).toContain('Loading states')
+    host.emitBackend({ type: 'init', requestId: 'uuid-v4-1', activeChatId: 'chat_abc',
+      config: { enabled: false, autoUpdate: true, connectionId: null, reasoningMode: 'off' },
+      connections: [], state: null, busy: false, statusMessage: 'Ready', error: null })
+    expect(panel.textContent).toContain('No states available')
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
+      internalState: { sections: { world: 42 } } })
+    expect(panel.textContent).toContain('No data available')
+    expect(panel.textContent).not.toContain('42')
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
+      internalState: { sections: null } })
+    expect(panel.textContent).toContain('Unable to load states')
+    host.emitEvent('CHAT_SWITCHED', { chatId: 'chat_new' })
+    expect(panel.textContent).toContain('Loading states')
+    host.emitBackend({ type: 'status', chatId: 'chat_new', status: 'error', message: 'Failed to load' })
+    expect(panel.textContent).toContain('Unable to load states')
+    host.emitEvent('CHAT_SWITCHED', { chatId: null })
+    expect(panel.textContent).toContain('Open a chat')
+    teardown()
+  })
+
+  test('map navigation keeps archived zone selection and zoom across views and refresh', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    const atlas = makeSampleState()
+    const archive = { ...atlas.maps.local, id: 'archive', name: 'Archive' }
+    const init = {
+      type: 'init', requestId: 'uuid-v4-1', activeChatId: 'chat_abc',
+      config: { enabled: true, autoUpdate: true, connectionId: 'conn', reasoningMode: 'inherit' },
+      connections: [], state: atlas, archives: { local: [archive], region: [], world: [] },
+      busy: false, statusMessage: 'Ready', error: null,
+    }
+    host.emitBackend(init)
+    const zone = host.tabRoot.querySelector('select[aria-label="Zone map"]') as HTMLSelectElement
+    const scale = host.tabRoot.querySelector('select[aria-label="Map scale"]') as HTMLSelectElement
+    const view = host.tabRoot.querySelector('select[aria-label="States view"]') as HTMLSelectElement
+    const change = (select: HTMLSelectElement, value: string) => {
+      select.value = value
+      select.dispatchEvent(new win.Event('change') as unknown as Event)
+    }
+    change(zone, 'archive')
+    change(scale, 'region')
+    change(scale, 'local')
+    expect(zone.value).toBe('archive')
+    const svg = host.tabRoot.querySelector('.la-svg') as SVGElement
+    const before = svg.getAttribute('viewBox')
+    ;(host.tabRoot.querySelector('button[title="Zoom in"]') as HTMLButtonElement).click()
+    const zoomed = svg.getAttribute('viewBox')
+    expect(zoomed).not.toBe(before)
+    change(view, 'world-scene')
+    expect(scale.disabled).toBe(true)
+    expect(zone.disabled).toBe(true)
+    change(view, 'map')
+    expect(zone.value).toBe('archive')
+    expect(svg.getAttribute('viewBox')).toBe(zoomed)
+    const reload = Array.from(host.tabRoot.querySelectorAll('button')).find(button => button.textContent === 'Reload') as HTMLButtonElement
+    reload.click()
+    const requestId = (host.sent[host.sent.length - 1] as { requestId: string }).requestId
+    host.emitBackend({ ...init, requestId })
+    expect(zone.value).toBe('archive')
+    expect(svg.getAttribute('viewBox')).toBe(zoomed)
+    const tile = host.tabRoot.querySelector('[data-tile-id="arcade_walkway"]') as SVGElement
+    tile.dispatchEvent(new win.MouseEvent('click', { bubbles: true }) as unknown as Event)
+    expect((host.tabRoot.querySelector('.la-inspector') as HTMLElement).textContent).toContain('Vending alcove')
+    teardown()
+  })
+
+  test('ledger-looking content cannot leak from ordinary state sections', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    const secret = '<details class="ldg-source"><activation>DORMANT</activation><stat>PRIVATE LEVEL 99</stat></details>'
+    host.emitBackend({ type: 'init', requestId: 'uuid-v4-1', activeChatId: 'chat_abc',
+      config: { enabled: true, autoUpdate: true, connectionId: null, reasoningMode: 'off' },
+      connections: [], state: null, busy: false, statusMessage: 'Ready', error: null,
+      internalState: { sections: { world: `<state:world><time>Morning</time>${secret}</state:world>` } } })
+    const view = host.tabRoot.querySelector('select[aria-label="States view"]') as HTMLSelectElement
+    view.value = 'world-scene'
+    view.dispatchEvent(new win.Event('change') as unknown as Event)
+    const panel = host.tabRoot.querySelector('.la-state-panel') as HTMLElement
+    expect(panel.textContent).toContain('Morning')
+    expect(panel.textContent).not.toContain('PRIVATE LEVEL 99')
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
+      internalState: { sections: { world: `<state:world><ledger><stats>PRIVATE LEVEL 99</stats></ledger></state:world>` } } })
+    expect(panel.textContent).not.toContain('PRIVATE LEVEL 99')
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
+      internalState: { sections: { world: '<state:world><ledger>PRIVATE LEVEL 99</ledger></state:world>' } } })
+    expect(panel.textContent).not.toContain('PRIVATE LEVEL 99')
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
+      internalState: { sections: { world: '<state:world><ledger>PRIVATE LEVEL 99</ledger></state:world>'.replace('<ledger>', '<ledger:secret xmlns:ledger="urn:ledger">').replace('</ledger>', '</ledger:secret>') } } })
+    expect(panel.textContent).not.toContain('PRIVATE LEVEL 99')
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
+      internalState: { sections: { world: '<state:ledger><stat>PRIVATE LEVEL 99</stat></state:ledger>' } } })
+    expect(panel.textContent).not.toContain('PRIVATE LEVEL 99')
+    teardown()
+  })
+
+  test('does not restore a stale archived zone if it disappeared from a completed refresh', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    const atlas = makeSampleState()
+    const archive = { ...atlas.maps.local, id: 'archive', name: 'Archive' }
+    const init = { type: 'init', requestId: 'uuid-v4-1', activeChatId: 'chat_abc',
+      config: { enabled: true, autoUpdate: true, connectionId: null, reasoningMode: 'off' },
+      connections: [], state: atlas, archives: { local: [archive], region: [], world: [] },
+      busy: false, statusMessage: 'Ready', error: null }
+    host.emitBackend(init)
+    const zone = host.tabRoot.querySelector('select[aria-label="Zone map"]') as HTMLSelectElement
+    zone.value = 'archive'
+    zone.dispatchEvent(new win.Event('change') as unknown as Event)
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready', state: atlas,
+      archives: { local: [], region: [], world: [] } })
+    expect(zone.value).toBe('kabuki_market')
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready', state: atlas,
+      archives: { local: [archive], region: [], world: [] } })
+    expect(zone.value).toBe('kabuki_market')
+    teardown()
+  })
+
+  test('a late stream from a closed chat cannot repopulate thinking', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    host.emitEvent('CHAT_SWITCHED', { chatId: null })
+    host.emitBackend({ type: 'stream', chatId: 'chat_abc', phase: 'thinking',
+      reasoning: 'PRIVATE OLD CHAT THOUGHT', outputChars: 0, outputTail: '' })
+    const thinking = host.tabRoot.querySelector('.la-thinking') as HTMLElement
+    expect(thinking.hidden).toBe(true)
+    expect(thinking.textContent).not.toContain('PRIVATE OLD CHAT THOUGHT')
+    teardown()
+  })
+
+  test('clear an in-progress thinking preview immediately when switching chats', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    host.emitBackend({ type: 'stream', chatId: 'chat_abc', phase: 'thinking',
+      reasoning: 'PRIVATE OLD CHAT THOUGHT', outputChars: 0, outputTail: '' })
+    const thinking = host.tabRoot.querySelector('.la-thinking') as HTMLElement
+    expect(thinking.textContent).toContain('PRIVATE OLD CHAT THOUGHT')
+    host.emitEvent('CHAT_SWITCHED', { chatId: 'chat_other' })
+    expect(thinking.hidden).toBe(true)
+    expect(thinking.textContent).not.toContain('PRIVATE OLD CHAT THOUGHT')
+    teardown()
+  })
+
+  test('an update for the same chat keeps the current selection even if refresh omits optional state', () => {
+    const host = createMockHost(win.document as unknown as Document)
+    const teardown = setup(host.ctx as unknown as Parameters<typeof setup>[0])
+    const init = { type: 'init', requestId: 'uuid-v4-1', activeChatId: 'chat_abc',
+      config: { enabled: true, autoUpdate: true, connectionId: null, reasoningMode: 'off' },
+      connections: [], state: null, busy: false, statusMessage: 'Ready', error: null }
+    host.emitBackend(init)
+    host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Ready',
+      internalState: { sections: { world: '<state:world><time>sunset</time></state:world>' } } })
+    const view = host.tabRoot.querySelector('select[aria-label="States view"]') as HTMLSelectElement
+    view.value = 'world-scene'
+    view.dispatchEvent(new win.Event('change') as unknown as Event)
+    const panel = host.tabRoot.querySelector('.la-state-panel') as HTMLElement
+    expect(panel.textContent).toContain('sunset')
+    const reload = Array.from(host.tabRoot.querySelectorAll('button')).find(button => button.textContent === 'Reload') as HTMLButtonElement
+    reload.click()
+    const requestId = (host.sent[host.sent.length - 1] as { requestId: string }).requestId
+    host.emitBackend({ ...init, requestId })
+    expect(panel.textContent).toContain('sunset')
+    teardown()
   })
 })

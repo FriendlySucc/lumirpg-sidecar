@@ -1,10 +1,14 @@
 import {
   cleanText,
   emptyAtlasState,
-  extractJsonObject,
   sanitizeProposal,
 } from './geometry.js'
-import { buildAtlasPrompt, SYSTEM_PROMPT, type PromptMessage } from './prompt.js'
+import { migrateLastInternalState, applyStateDelta, type InternalState } from './internal-state.js'
+import { applyMapDelta } from './map-delta.js'
+import { assessGeneration, sameSourceRevision, type GenerationStart, type SourceRevision } from './generation-policy.js'
+import { buildUnifiedPrompt, extractUnifiedDelta, UNIFIED_SYSTEM_PROMPT } from './unified-prompt.js'
+import { prepareSimulationContext } from './context-bridge.js'
+import type { PromptMessage } from './prompt.js'
 import type {
   AtlasState,
   BackendToFrontendMessage,
@@ -33,6 +37,7 @@ interface Origin {
 interface ActiveGeneration {
   id: string
   sessionId?: string
+  start: GenerationStart
 }
 
 interface ChatRuntime {
@@ -49,6 +54,7 @@ interface ChatRuntime {
 
 const runtimes = new Map<string, ChatRuntime>()
 let generationUnsubs: Array<() => void> = []
+let interceptorUnsub: (() => void) | null = null
 
 function validUserId(userId: unknown): userId is string {
   return typeof userId === 'string' && userId.length > 0 && userId.length <= 256 && !/[\u0000-\u001f]/.test(userId)
@@ -85,7 +91,7 @@ function chatRecordPath(chatId: string): string {
 function defaultChatRecord(chatId: string): StoredChatRecord {
   return {
     schema: 1,
-    config: { enabled: false, autoUpdate: true },
+    config: { enabled: true, autoUpdate: true },
     state: emptyAtlasState(chatId),
     archives: { local: [], region: [], world: [] },
   }
@@ -123,7 +129,7 @@ async function loadChatRecord(rt: ChatRuntime): Promise<StoredChatRecord> {
       const record: StoredChatRecord = {
         schema: 1,
         config: {
-          enabled: raw.config?.enabled === true,
+          enabled: typeof raw.config?.enabled === 'boolean' ? raw.config.enabled : true,
           autoUpdate: raw.config?.autoUpdate !== false,
         },
         state: raw.state,
@@ -132,12 +138,17 @@ async function loadChatRecord(rt: ChatRuntime): Promise<StoredChatRecord> {
           region: Array.isArray(raw.archives?.region) ? raw.archives.region : [],
           world: Array.isArray(raw.archives?.world) ? raw.archives.world : [],
         },
+        internalState: raw.internalState,
+        sourceRevision: raw.sourceRevision,
+        processedGenerationId: raw.processedGenerationId,
       }
       rt.record = record
       return record
     }
+    if (raw !== null) throw new Error('Stored chat record is malformed; refusing to replace it.')
   } catch (err) {
     spindle.log.warn(`LumiAtlas: failed loading record for ${rt.chatId}: ${err instanceof Error ? err.message : String(err)}`)
+    throw new Error('Could not read the saved Atlas; no changes were made.')
   }
   const fresh = defaultChatRecord(rt.chatId)
   rt.record = fresh
@@ -198,8 +209,9 @@ function emitStatus(
   config?: EffectiveConfig,
   origin?: Origin,
   archives?: Record<Scale, MapLayer[]>,
+  internalState?: InternalState,
 ): void {
-  sendToUI(userId, { type: 'status', chatId, status, message, state, archives, config }, origin)
+  sendToUI(userId, { type: 'status', chatId, status, message, state, archives, internalState, config }, origin)
 }
 
 function emitStream(
@@ -248,12 +260,15 @@ export function prepareMessageText(raw: string): string {
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<details\s+class=["']ldg-source["'][^>]*>[\s\S]*?<\/details>/gi, '')
+    .replace(/<internal_states\b[^>]*>[\s\S]*?<\/internal_states\s*>/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
 async function readRecentMessages(chatId: string): Promise<{
   messages: PromptMessage[]
+  originalMessages: PromptMessage[]
+  latestSource: SourceRevision | null
   latestMessageId: string | null
   totalRead: number
 }> {
@@ -273,16 +288,21 @@ async function readRecentMessages(chatId: string): Promise<{
   )
 
   const messages: PromptMessage[] = []
+  const originalMessages: PromptMessage[] = []
+  let latestSource: SourceRevision | null = null
   let latestMessageId: string | null = null
 
   for (const msg of visible) {
+    originalMessages.push({ role: msg.role, content: msg.content })
     const cleaned = prepareMessageText(msg.content)
-    if (!cleaned) continue
-    messages.push({ role: msg.role, content: cleaned })
-    if (typeof msg.id === 'string' && msg.id) latestMessageId = msg.id
+    if (cleaned) messages.push({ role: msg.role, content: cleaned })
+    if (typeof msg.id === 'string' && msg.id) {
+      latestMessageId = msg.id
+      latestSource = { id: msg.id, role: msg.role, swipe_id: Number.isInteger(msg.swipe_id) ? msg.swipe_id : 0, content: msg.content }
+    }
   }
 
-  return { messages, latestMessageId, totalRead: visible.length }
+  return { messages, originalMessages, latestSource, latestMessageId, totalRead: visible.length }
 }
 
 function archiveLayerIfChanged(record: StoredChatRecord, nextState: AtlasState): Record<Scale, MapLayer[]> {
@@ -300,6 +320,32 @@ function archiveLayerIfChanged(record: StoredChatRecord, nextState: AtlasState):
     }
   }
   return archives
+}
+
+/** A blank but fully-shaped simulation record for chats without legacy state. */
+function blankInternalState(): InternalState {
+  return {
+    sections: {
+      world: '<state:world></state:world>',
+      onscreen: '<state:onscreen></state:onscreen>',
+      offscreen_agendas: '<state:offscreen_agendas></state:offscreen_agendas>',
+      locations: '<state:locations></state:locations>',
+      entityMem: '<state:entityMem></state:entityMem>',
+      entity_state: '<state:entity_state></state:entity_state>',
+      thoughts: '<state:thoughts></state:thoughts>',
+      dam: '<state:dam></state:dam>',
+      pair: '<state:pair></state:pair>',
+      reputation: '<state:reputation></state:reputation>',
+      tracks: '<state:tracks></state:tracks>',
+      arc: '<state:arc></state:arc>',
+      chekhov: '<state:chekhov></state:chekhov>',
+      leads: '<state:leads></state:leads>',
+      inv: '<state:inv></state:inv>',
+      story_notes: '<state:story_notes></state:story_notes>',
+      notebook: '<state:notebook></state:notebook>',
+      vent: '<state:vent></state:vent>',
+    },
+  }
 }
 
 function extractResponseContent(result: unknown): string {
@@ -321,6 +367,7 @@ async function runAnalysis(
   mode: 'update' | 'rebuild',
   trigger: 'auto' | 'manual',
   origin?: Origin,
+  expected?: { messageId: string; generationId: string },
 ): Promise<void> {
   let myEpoch = rt.epoch
   let controller: AbortController | null = null
@@ -359,31 +406,38 @@ async function runAnalysis(
     if (trigger === 'auto' && (!record.config.enabled || !record.config.autoUpdate)) return
 
     if (!userConfig.connectionId) {
-      if (trigger === 'manual') {
-        emitStatus(rt.userId, rt.chatId, 'error', 'Pick a background connection (e.g. Terra) in Settings first.', record.state, effectiveConfig, origin, record.archives)
-      }
+      emitStatus(rt.userId, rt.chatId, 'error', 'Pick a background connection (e.g. Terra) in Settings first.', record.state, effectiveConfig, origin, record.archives, record.internalState)
       return
     }
 
     const connections = await listConnections(rt.userId)
     const chosen = connections.find((c) => c.id === userConfig.connectionId)
     if (!chosen) {
-      if (trigger === 'manual') {
-        emitStatus(rt.userId, rt.chatId, 'error', 'Selected connection is no longer available. Pick another in Settings.', record.state, effectiveConfig, origin, record.archives)
-      }
+      emitStatus(rt.userId, rt.chatId, 'error', 'Selected background connection is unavailable. Pick another in Settings.', record.state, effectiveConfig, origin, record.archives, record.internalState)
       return
     }
 
-    const { messages, latestMessageId, totalRead } = await readRecentMessages(rt.chatId)
-    if (!messages.length) {
-      if (trigger === 'manual') {
-        emitStatus(rt.userId, rt.chatId, 'error', 'No visible chat messages to map yet.', record.state, effectiveConfig, origin, record.archives)
-      }
+    if (!await spindle.chats.get(rt.chatId, rt.userId)) throw new Error('Chat is unavailable for this user.')
+    const { messages, originalMessages, latestSource, latestMessageId, totalRead } = await readRecentMessages(rt.chatId)
+    if (!messages.length || !latestSource || latestSource.role !== 'assistant') {
+      emitStatus(rt.userId, rt.chatId, 'error', 'No current assistant reply to simulate yet.', record.state, effectiveConfig, origin, record.archives, record.internalState)
       return
     }
-
-    if (trigger === 'auto' && latestMessageId && record.state.analyzedMessageId === latestMessageId && !record.state.stale) {
-      return
+    if (expected && latestSource.id !== expected.messageId) throw new Error('Reply changed before simulation started. Previous state kept.')
+    if (trigger === 'auto' && expected && record.processedGenerationId === expected.generationId) return
+    if (trigger === 'auto' && record.sourceRevision && sameSourceRevision(record.sourceRevision, latestSource) && !record.state.stale) return
+    if (record.state.stale) {
+      if (trigger === 'auto' || mode !== 'rebuild') {
+        emitStatus(rt.userId, rt.chatId, 'stale', 'Chat history diverged. Use Rebuild to re-simulate from the current transcript; previous state is kept until the new snapshot is verified.', record.state, effectiveConfig, origin, record.archives, record.internalState)
+        return
+      }
+      // Manual rebuild re-reads the current transcript and writes a new snapshot
+      // only after the source is verified unchanged at commit time.
+    }
+    let seedState = record.internalState
+    if (!seedState) {
+      const migrated = migrateLastInternalState(originalMessages)
+      seedState = Object.keys(migrated.sections).length || migrated.ledger ? migrated : blankInternalState()
     }
 
     cancelRuntime(rt)
@@ -410,7 +464,7 @@ async function runAnalysis(
       record.archives,
     )
 
-    const userPrompt = buildAtlasPrompt(messages, mode === 'rebuild' ? null : record.state, mode)
+    const userPrompt = buildUnifiedPrompt(messages, record.state, seedState)
     const effectiveModel = chosen.model.trim()
     const genParams: Record<string, unknown> = { temperature: 0.2, max_tokens: 4800 }
     if (effectiveModel) genParams.model = effectiveModel
@@ -421,7 +475,7 @@ async function runAnalysis(
       ...(effectiveModel ? { model: effectiveModel } : {}),
       userId: rt.userId,
       messages: [
-        { role: 'system' as const, content: SYSTEM_PROMPT },
+        { role: 'system' as const, content: UNIFIED_SYSTEM_PROMPT },
         { role: 'user' as const, content: userPrompt },
       ],
       parameters: genParams,
@@ -474,25 +528,44 @@ async function runAnalysis(
       throw new Error(`${chosen.name} returned an empty response.`)
     }
 
-    const parsed = extractJsonObject(content)
-    const nextState = sanitizeProposal(
-      parsed,
-      rt.chatId,
-      latestMessageId,
-      totalRead,
-      mode === 'rebuild' ? undefined : record.state,
-    )
-
+    const parsed = extractUnifiedDelta(content)
+    const nextInternalState = applyStateDelta(seedState, parsed.statePatch)
+    const patchedAtlas = applyMapDelta(record.state, parsed.mapPatch)
+    const nextState: AtlasState = {
+      ...patchedAtlas,
+      updatedAt: new Date().toISOString(),
+      analyzedMessageId: latestMessageId,
+      analyzedMessageCount: totalRead,
+      stale: false,
+      staleReason: '',
+    }
     const nextRecord: StoredChatRecord = {
-      schema: 1,
-      config: record.config,
+      ...record,
       state: nextState,
+      internalState: nextInternalState,
+      sourceRevision: latestSource,
+      processedGenerationId: expected?.generationId,
       archives: archiveLayerIfChanged(record, nextState),
     }
 
     if (controller.signal.aborted || myEpoch !== rt.epoch) return
-
-    await saveChatRecord(rt, nextRecord)
+    const latest = await readRecentMessages(rt.chatId)
+    if (!latest.latestSource || !sameSourceRevision(latestSource, latest.latestSource)) {
+      await markStale(rt, 'Chat reply changed during simulation. Previous state kept.', origin)
+        emitStatus(rt.userId, rt.chatId, 'stale', 'Chat reply changed during simulation. Use Rebuild to re-simulate; previous state kept.', record.state, effectiveConfig, origin, record.archives, record.internalState)
+      return
+    }
+    if (controller.signal.aborted || myEpoch !== rt.epoch) return
+    try {
+      await saveChatRecord(rt, nextRecord)
+    } catch {
+      rt.record = { ...record, state: { ...record.state, stale: true, staleReason: 'Simulation save could not be confirmed.' } }
+      throw new Error('Simulation save could not be confirmed. Refresh before retrying.')
+    }
+    if (controller.signal.aborted || myEpoch !== rt.epoch) {
+      await markStale(rt, 'Chat changed while simulation was being saved. Verify or rebuild.', origin)
+      return
+    }
 
     const counts = `${nextState.maps.local.tiles.length} local · ${nextState.maps.region.tiles.length} region · ${nextState.maps.world.tiles.length} world`
     emitStatus(
@@ -504,6 +577,7 @@ async function runAnalysis(
       effectiveConfig,
       origin,
       nextRecord.archives,
+      nextRecord.internalState,
     )
   } catch (err) {
     if (controller && myEpoch !== rt.epoch) return
@@ -512,9 +586,7 @@ async function runAnalysis(
       ? 'Atlas update was cancelled or timed out. Previous map kept.'
       : `Atlas update failed: ${err instanceof Error ? err.message : String(err)}`
     spindle.log.warn(`LumiAtlas (${runId}): ${detail}`)
-    if (trigger === 'manual' || controller) {
-      emitStatus(rt.userId, rt.chatId, 'error', detail, fallbackState, undefined, origin)
-    }
+    emitStatus(rt.userId, rt.chatId, 'error', detail, fallbackState, undefined, origin)
   } finally {
     if (rt.timer) {
       clearTimeout(rt.timer)
@@ -566,7 +638,10 @@ function registerGenerationEvents(): void {
       const row = payload as unknown as Record<string, unknown>
       if (row.backgroundSwipe === true || typeof row.generationId !== 'string' || !row.generationId) return
       cancelRuntime(rt)
-      rt.generation = { id: row.generationId, sessionId: eventOrigin(payload)?.sessionId }
+      rt.generation = { id: row.generationId, sessionId: eventOrigin(payload)?.sessionId, start: row }
+      if (typeof row.generationType === 'string' && ['swipe', 'regenerate', 'continue'].includes(row.generationType)) {
+        void enqueue(rt, () => markStale(rt, 'A previous reply was regenerated or changed. Simulation must be reconciled.', eventOrigin(payload)))
+      }
     }),
   )
 
@@ -576,11 +651,13 @@ function registerGenerationEvents(): void {
       if (!rt) return
       const row = payload as unknown as Record<string, unknown>
       if (!rt.generation || rt.generation.id !== row.generationId) return
-      const sessionId = rt.generation.sessionId
+      const active = rt.generation
       rt.generation = undefined
-      if (row.error) return
+      const decision = assessGeneration(active.start, row)
+      if (!decision.eligible || !decision.messageId) return
       void enqueue(rt, () =>
-        runAnalysis(rt, 'update', 'auto', sessionId ? { sessionId } : undefined),
+        runAnalysis(rt, 'update', 'auto', active.sessionId ? { sessionId: active.sessionId } : undefined,
+          { messageId: decision.messageId!, generationId: active.id }),
       )
     }),
   )
@@ -597,9 +674,32 @@ function registerGenerationEvents(): void {
   )
 }
 
+function registerSimulationInterceptor(): void {
+  if (interceptorUnsub || !spindle.permissions.has('interceptor')) return
+  interceptorUnsub = spindle.registerInterceptor(async (messages, context) => {
+    if (!context || !validUserId(context.userId) || !validId(context.chatId)) return messages
+    try {
+      if (!await spindle.chats.get(context.chatId, context.userId)) return messages
+      const rt = getRuntime(context.userId, context.chatId)
+      const record = await loadChatRecord(rt)
+      if (!record.config.enabled || record.state.stale || !record.internalState) return messages
+      return prepareSimulationContext(messages, record.internalState)
+    } catch (err) {
+      spindle.log.warn(`LumiAtlas context unavailable: ${err instanceof Error ? err.message : String(err)}`)
+      return messages
+    }
+  }, 60)
+}
+
 registerGenerationEvents()
+registerSimulationInterceptor()
 
 spindle.permissions.onChanged(({ permission, granted }) => {
+  if (permission === 'interceptor') {
+    if (granted) registerSimulationInterceptor()
+    else { interceptorUnsub?.(); interceptorUnsub = null }
+    return
+  }
   if (permission !== 'generation') return
   if (granted) {
     registerGenerationEvents()
@@ -619,19 +719,10 @@ for (const ev of ['MESSAGE_EDITED', 'MESSAGE_DELETED', 'MESSAGE_SWIPED', 'SWIPE_
     if (!rt) return
     cancelRuntime(rt)
     void enqueue(rt, () =>
-      markStale(rt, 'Chat history changed (edit, delete, or swipe). Click Update or Rebuild to sync.', eventOrigin(payload)),
+      markStale(rt, 'Chat history changed (edit, delete, or swipe). Use Rebuild to re-simulate from the current transcript.', eventOrigin(payload)),
     )
   })
 }
-
-spindle.on('CHAT_SWITCHED', (_payload, userId) => {
-  if (!validUserId(userId)) return
-  for (const rt of runtimes.values()) {
-    if (rt.userId === userId) {
-      rt.generation = undefined
-    }
-  }
-})
 
 spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessionId?: string) => {
   if (!validUserId(userId) || !payload || typeof payload !== 'object') return
@@ -677,6 +768,10 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
       }
 
       const rt = getRuntime(userId, activeChatId)
+      if (!await spindle.chats.get(activeChatId, userId)) {
+        emitStatus(userId, activeChatId, 'error', 'Chat is unavailable for this user.', undefined, undefined, origin)
+        return
+      }
       const record = await loadChatRecord(rt)
       const effective: EffectiveConfig = {
         ...record.config,
@@ -701,6 +796,7 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string, frontendSessi
           connections,
           state: record.state,
           archives: record.archives,
+          internalState: record.internalState,
           busy: rt.busy,
           statusMessage,
           error: null,
