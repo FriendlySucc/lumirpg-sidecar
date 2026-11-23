@@ -1224,7 +1224,7 @@ function transformKnownBlock(text) {
   }
   return null;
 }
-var CONTROL = /<\/?internal_states(?:_spec)?\b|<\/?internal_atlas_spec\b|<fn:atlas\b|<fn:first_turn_init\b|<gmnotebook\b|<\/?(?:page:(?:boot|mechanics|router|tail|output))\b|(?:\b(?:emit|output|append|generate|update|print|track|write|produce|restore|diff)\b[^\n.!?]{0,100}\binternal[ _-]+states?\b)|(?:\binternal[ _-]+states?\b[^\n.!?]{0,100}\b(?:emit|output|append|generate|update|print|track|write|produce|restore|diff|block|template|simulation|bookkeeping)\b)|\b(?:atlas|state)\s+(?:bookkeeping|generation|template)\b/i;
+var CONTROL = /<\/?internal_states(?:_spec)?\b|<\/?internal_atlas_spec\b|<fn:atlas\b|<fn:first_turn_init\b|<gmnotebook\b|(?:\b(?:emit|output|append|generate|update|print|track|write|produce|restore|diff)\b[^\n.!?]{0,100}\binternal[ _-]+states?\b)|(?:\binternal[ _-]+states?\b[^\n.!?]{0,100}\b(?:emit|output|append|generate|update|print|track|write|produce|restore|diff|block|template|simulation|bookkeeping)\b)|\b(?:atlas|state)\s+(?:bookkeeping|generation|template)\b/i;
 function compactHistory(text) {
   const tags = [...text.matchAll(/<\/?internal_states\b[^>]*>/g)];
   let depth = 0;
@@ -1318,8 +1318,6 @@ function offloadPrompt(messages, stateXml) {
       transformed.push(message);
     }
   }
-  if (!found)
-    return fail("unsupported-prompt");
   const escapedState = stateXml.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   transformed.push({
     role: "system",

@@ -89,8 +89,8 @@ function transformKnownBlock(text: string): string | null {
 }
 
 // Generation/output directives and simulator-only dispatch. Reading reference
-// fields (colors, voices, clock, agendas) remains valid RP work.
-const CONTROL = /<\/?internal_states(?:_spec)?\b|<\/?internal_atlas_spec\b|<fn:atlas\b|<fn:first_turn_init\b|<gmnotebook\b|<\/?(?:page:(?:boot|mechanics|router|tail|output))\b|(?:\b(?:emit|output|append|generate|update|print|track|write|produce|restore|diff)\b[^\n.!?]{0,100}\binternal[ _-]+states?\b)|(?:\binternal[ _-]+states?\b[^\n.!?]{0,100}\b(?:emit|output|append|generate|update|print|track|write|produce|restore|diff|block|template|simulation|bookkeeping)\b)|\b(?:atlas|state)\s+(?:bookkeeping|generation|template)\b/i
+// fields (colors, voices, clock, agendas) and clean RP workflow pages remain valid.
+const CONTROL = /<\/?internal_states(?:_spec)?\b|<\/?internal_atlas_spec\b|<fn:atlas\b|<fn:first_turn_init\b|<gmnotebook\b|(?:\b(?:emit|output|append|generate|update|print|track|write|produce|restore|diff)\b[^\n.!?]{0,100}\binternal[ _-]+states?\b)|(?:\binternal[ _-]+states?\b[^\n.!?]{0,100}\b(?:emit|output|append|generate|update|print|track|write|produce|restore|diff|block|template|simulation|bookkeeping)\b)|\b(?:atlas|state)\s+(?:bookkeeping|generation|template)\b/i
 
 // Do not scan across blocks or parts; malformed/nested material stays intact.
 function compactHistory(text: string): string {
@@ -178,7 +178,6 @@ export function offloadPrompt(messages: LlmMessageDTO[], stateXml: string | null
       transformed.push(message)
     }
   }
-  if (!found) return fail('unsupported-prompt')
   const escapedState = stateXml.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   transformed.push({
     role: 'system',

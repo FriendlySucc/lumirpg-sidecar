@@ -282,6 +282,23 @@ describe('prompt offload', () => {
     expect(result.messages[1].content).toBe(nested)
   })
 
+  test('injects read-only state into a lean RP-only preset with no Internal States Template', () => {
+    const messages: LlmMessageDTO[] = [
+      { role: 'system', content: 'You are Vexa, the storyteller. Read <state:entity_state> for speaker colors.' },
+      { role: 'assistant', __isChatHistory: true, content: `Earlier prose. ${state}` },
+      { role: 'user', __isChatHistory: true, content: 'Kris walks onto the bridge.' },
+      { role: 'user', content: '<page:tail>Keep rich characterful prose and end on a natural beat.</page:tail>' },
+    ]
+    const result = offloadPrompt(messages, state)
+    expect(result.compatible).toBe(true)
+    expect(result.reason).toBe('offloaded')
+    expect(result.messages[1].content).toBe('Earlier prose. ')
+    const injected = result.messages[result.messages.length - 1]
+    expect(injected.role).toBe('system')
+    expect(injected.content).toContain('<lumiatlas_reference_data>')
+    expect(injected.content).toContain('&lt;loc&gt;Market&lt;/loc&gt;')
+  })
+
   test('without a canonical state it fails closed without changing the prompt', async () => {
     const messages: LlmMessageDTO[] = [{ role: 'user', content: 'A synthetic scene.' }]
     const result = offloadPrompt(messages, '')
