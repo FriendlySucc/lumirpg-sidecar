@@ -5,6 +5,7 @@ import {
   defaultTileColor,
   findSharedEdge,
 } from './geometry.js'
+import { LEDGER_ELEMENT, renderStateSection } from './state-renderer.js'
 import type {
   AtlasState,
   BackendToFrontendMessage,
@@ -32,12 +33,10 @@ const STYLES = `
   height: 100%;
   min-height: 0;
   color: #e8e4df;
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: var(--la-font-size, 12px);
+  font-family: var(--lumiverse-font-family, system-ui, -apple-system, sans-serif);
+  font-size: calc(13px * var(--lumiverse-font-scale, 1));
   line-height: 1.45;
   background: #0f0d0b;
-  /* Scale from Lumiverse theme font size if available */
-  --la-font-size: max(11px, min(16px, var(--lumi-font-size, var(--theme-font-size, 12px))));
 }
 .la-root * { box-sizing: border-box; }
 
@@ -146,7 +145,7 @@ const STYLES = `
   display: flex; min-height: 0; flex: 1;
 }
 .la-sidebar {
-  width: 110px; flex: none;
+  width: 9.5em; flex: none;
   border-right: 1px solid #2a2520;
   overflow-y: auto;
   padding: 4px 0;
@@ -177,137 +176,137 @@ const STYLES = `
   padding: 6px;
 }
 
-/* ── Collapsible cards ── */
+/* ── Collapsible cards & native Vexa GFX ── */
 .la-card {
-  margin-bottom: 4px;
-  border: 1px solid #2a2520;
-  border-radius: 6px;
-  background: #1a1612;
+  margin-bottom: 5px;
+  border: 1px solid #2d2620;
+  border-radius: 7px;
+  background: #181411;
   overflow: hidden;
 }
+.la-card-open { border-color: #c4973c; }
 .la-card-head {
-  display: flex; align-items: center; gap: 5px;
-  padding: 4px 8px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 9px;
   cursor: pointer;
   transition: background 80ms;
 }
-.la-card-head:hover { background: rgba(196,151,60,0.04); }
+.la-card-head:hover { background: rgba(196,151,60,0.05); }
 .la-card-head.la-expanded {
-  border-bottom: 1px solid #2a2520;
-  background: rgba(196,151,60,0.06);
+  border-bottom: 1px solid #2d2620;
+  background: rgba(196,151,60,0.08);
 }
-.la-card-chevron {
-  font-size: 0.85em; color: #c4973c;
-  transition: transform 100ms;
-  width: 12px; text-align: center;
-}
-.la-card-head.la-expanded .la-card-chevron { transform: rotate(90deg); }
-.la-card-head.la-flat { cursor: default; }
-.la-card-head.la-flat:hover { background: transparent; }
-.la-card-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
-.la-card-name { font-weight: 700; font-size: 0.92em; color: #e0d8cc; flex: 1; }
+.la-card-chevron { font-size: 0.85em; color: #c4973c; width: 1em; text-align: center; flex: none; }
+.la-card-icon { font-size: 0.95em; flex: none; }
+.la-card-name { font-weight: 700; font-size: 0.94em; color: #ece5da; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.la-loc-id { font-family: var(--lumiverse-font-mono, ui-monospace, monospace); font-size: 0.78em; color: #8a8078; background: #231e19; padding: 1px 4px; border-radius: 3px; }
 .la-card-badge {
-  font-size: 0.75em; font-weight: 600;
-  padding: 0 5px; border-radius: 3px;
-  background: #252018; border: 1px solid #3a332a;
-  color: #b0a090;
+  font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 1px 6px; border-radius: 999px; flex: none;
+  background: #252018; border: 1px solid #4a3d2e; color: #d4b886;
 }
-.la-card-body { padding: 6px 8px; }
+.la-card-body { padding: 7px 9px; display: flex; flex-direction: column; gap: 6px; }
+.la-card-subtext { font-size: 0.9em; color: #b8afa3; white-space: normal; overflow-wrap: anywhere; }
+.la-card-location { font-size: 0.86em; color: #c4b59d; }
 .la-card-detail {
-  margin-top: 4px;
-  padding: 4px 6px;
-  background: rgba(196,151,60,0.03);
-  border-radius: 4px;
-  border: 1px solid #252018;
+  padding: 5px 7px; background: rgba(196,151,60,0.04);
+  border-radius: 5px; border: 1px solid #28221c; border-left: 2px solid #c4973c;
 }
-.la-card-detail-title {
-  font-size: 0.75em; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em;
-  color: #8a8078; margin-bottom: 2px;
+.la-card-detail-title { font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #9c8f80; margin-bottom: 2px; }
+.la-card-detail-text { font-size: 0.92em; color: #dcd4c8; white-space: normal; overflow-wrap: anywhere; }
+.la-card-footer { font-size: 0.8em; color: #8a8078; border-top: 1px solid #26201a; padding-top: 4px; }
+
+/* ── World HUD & Flat panels ── */
+.la-world-hud { display: flex; flex-direction: column; gap: 6px; }
+.la-world-bar { display: flex; flex-wrap: wrap; gap: 4px; }
+.la-world-pill { padding: 2px 7px; border-radius: 5px; background: #1c1713; border: 1px solid #2f2821; font-size: 0.84em; color: #d4ccc0; }
+.la-world-ct { border-color: #c4973c; color: #e8d5a0; font-weight: 700; }
+.la-world-pacing { border-color: #6a8ae8; color: #b8ccf4; font-weight: 600; }
+.la-flat-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+.la-flat-group-title { font-size: 0.78em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #c4973c; padding: 2px 2px 0; }
+.la-flat-panel {
+  padding: 7px 9px; margin-bottom: 5px;
+  border: 1px solid #2d2620; border-radius: 7px; background: #181411;
+  display: flex; flex-direction: column; gap: 4px;
 }
-.la-card-detail-text { font-size: 0.92em; color: #c4bcb0; }
-.la-card-fields { display: grid; gap: 2px; }
-.la-card-field { display: flex; gap: 4px; }
-.la-card-field-label { font-weight: 600; color: #8a8078; min-width: 60px; flex: none; font-size: 0.85em; }
-.la-card-field-value { color: #c4bcb0; font-size: 0.92em; }
-.la-card-location { font-size: 0.85em; color: #8a8078; margin-bottom: 4px; }
+.la-flat-highlight { border-left: 2px solid #c4973c; background: rgba(196,151,60,0.05); }
+.la-flat-badge {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  padding: 1px 7px; border-radius: 999px;
+  background: #231e19; border: 1px solid #3a3128;
+  font-size: 0.76em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #c8bfb2;
+}
+.la-flat-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.la-flat-title { font-weight: 700; font-size: 0.94em; color: #efe8de; }
+.la-flat-meta { font-size: 0.84em; color: #9c9082; }
+.la-flat-text { font-size: 0.92em; color: #ddd5c9; white-space: normal; overflow-wrap: anywhere; line-height: 1.48; }
 
-/* ── Pair metric bars ── */
-.la-pair-bars { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-.la-pair-bar-row { display: flex; align-items: center; gap: 4px; }
-.la-pair-bar-label { font-size: 0.85em; font-weight: 600; min-width: 70px; }
-.la-pair-left { text-align: right; color: #e87a6a; }
-.la-pair-right { text-align: left; color: #6ab4e8; }
-.la-pair-bar { flex: 1; height: 8px; background: #252018; border-radius: 3px; overflow: hidden; position: relative; }
-.la-pair-bar-left { direction: rtl; }
-.la-pair-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #c4973c, #e8b84e); }
-.la-pair-bar-left .la-pair-bar-fill { background: linear-gradient(90deg, #e87a6a, #c45a4a); }
+/* ── Metadata chips, Memory, Profile KV ── */
+.la-meta-bar { display: flex; flex-wrap: wrap; gap: 4px; }
+.la-meta-chip { padding: 1px 6px; border-radius: 999px; background: #221d18; border: 1px solid #352d25; font-size: 0.8em; color: #c4bcb0; }
+.la-meta-mono { font-family: var(--lumiverse-font-mono, ui-monospace, monospace); color: #d4b886; }
+.la-mem-entry { padding: 5px 7px; border-radius: 5px; background: #14110e; border: 1px solid #28221c; display: flex; flex-direction: column; gap: 4px; }
+.la-mem-fact { font-size: 0.92em; color: #ddd5c9; white-space: normal; overflow-wrap: anywhere; }
+.la-mem-cert { border-color: #4a6a50; color: #9ad8a6; }
+.la-kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11em, 1fr)); gap: 5px; }
+.la-kv-cell { padding: 4px 6px; border-radius: 5px; background: #14110e; border: 1px solid #28221c; }
+.la-kv-k { font-size: 0.76em; font-weight: 700; text-transform: uppercase; color: #8a8078; }
+.la-kv-v { font-size: 0.9em; color: #d8d0c4; overflow-wrap: anywhere; }
+.la-color-row { display: flex; align-items: center; gap: 6px; }
+.la-color-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25); flex: none; }
 
-/* ── Dams sections ── */
-.la-dam-section { margin-top: 6px; padding: 4px 6px; background: rgba(196,151,60,0.03); border-radius: 4px; border: 1px solid #252018; }
-.la-dam-section-title { font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8078; margin-bottom: 4px; }
-.la-dam-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 2px 0; }
-.la-dam-toggle-label { font-size: 0.92em; font-weight: 600; color: #c4bcb0; }
-.la-dam-toggle-val { font-size: 0.85em; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
-.la-dam-sealed { background: rgba(196,151,60,0.15); color: #c4973c; border: 1px solid #c4973c; }
-.la-dam-open { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid #4ade80; }
-.la-dam-yes { background: rgba(244,114,182,0.12); color: #f472b6; border: 1px solid #f472b6; }
-.la-dam-no { background: rgba(255,255,255,0.06); color: #a0a0a0; border: 1px solid #555; }
-.la-dam-filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-.la-dam-filter-cell { padding: 4px; background: #1a1612; border-radius: 4px; border: 1px solid #2a2520; }
-.la-dam-filter-name { font-size: 0.85em; font-weight: 700; color: #c4bcb0; margin-bottom: 2px; }
-.la-dam-filter-val { font-size: 0.85em; font-weight: 600; }
-.la-dam-crack { color: #c4973c; }
-.la-dam-hard { color: #e87a6a; }
-.la-dam-intent { margin-top: 6px; padding: 4px 6px; font-size: 0.92em; color: #c4bcb0; background: rgba(196,151,60,0.04); border-radius: 4px; }
-.la-dam-intent-label { font-weight: 700; color: #c4973c; }
+/* ── Notebook rows ── */
+.la-nb-row {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 7px 9px; margin-bottom: 5px;
+  border: 1px solid #2d2620; border-radius: 7px; background: #181411;
+}
+.la-nb-icon { flex: none; font-size: 0.92em; color: #e89b4e; line-height: 1.45; }
+
+/* ── Pair bidirectional metric bars ── */
+.la-axis-stack { display: flex; flex-direction: column; gap: 7px; }
+.la-axis-row { display: flex; flex-direction: column; gap: 3px; }
+.la-axis-labels { display: flex; justify-content: space-between; gap: 6px; font-size: 0.84em; flex-wrap: wrap; }
+.la-axis-side { display: inline-flex; align-items: baseline; gap: 4px; font-weight: 600; }
+.la-axis-neg { color: #e8907e; }
+.la-axis-pos { color: #8ec8f2; }
+.la-axis-acc { font-size: 0.85em; font-weight: 400; color: #8a8078; }
+.la-axis-track { display: flex; align-items: center; height: 8px; background: #241f1a; border-radius: 4px; overflow: hidden; }
+.la-axis-half { flex: 1; height: 100%; display: flex; }
+.la-axis-half-neg { justify-content: flex-end; }
+.la-axis-half-pos { justify-content: flex-start; }
+.la-axis-center { width: 2px; height: 100%; background: #4a4036; flex: none; }
+.la-axis-fill { height: 100%; border-radius: 3px; }
+
+/* ── Dams dashboard (Sluices, Flags, Filters, Intent) ── */
+.la-dam-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(11em, 1fr)); gap: 6px; }
+.la-dam-block { padding: 6px 7px; background: #14110e; border-radius: 6px; border: 1px solid #28221c; display: flex; flex-direction: column; gap: 5px; }
+.la-dam-block-title { font-size: 0.74em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8078; }
+.la-dam-ctrl { display: flex; flex-direction: column; gap: 3px; }
+.la-dam-ctrl-name { font-size: 0.82em; font-weight: 700; color: #cfc6b9; }
+.la-dam-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.la-dam-opts-4 { grid-template-columns: repeat(4, 1fr); }
+.la-dam-opt { text-align: center; font-size: 0.72em; font-weight: 700; padding: 2px 3px; border-radius: 4px; background: #1d1814; border: 1px solid #2d2620; color: #6a6058; }
+.la-opt-amber { background: rgba(196,151,60,0.18); border-color: #c4973c; color: #f0c975; }
+.la-opt-green { background: rgba(74,222,128,0.14); border-color: #4ade80; color: #86efac; }
+.la-opt-red { background: rgba(232,106,106,0.16); border-color: #e86a6a; color: #fca5a5; }
+.la-opt-blue { background: rgba(96,165,250,0.16); border-color: #60a5fa; color: #93c5fd; }
+.la-opt-neutral { background: rgba(255,255,255,0.08); border-color: #7a7068; color: #e8e4df; }
+.la-dam-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11em, 1fr)); gap: 5px; }
+.la-dam-filter-cell { padding: 5px 6px; background: #181411; border-radius: 5px; border: 1px solid #2a241e; display: flex; flex-direction: column; gap: 4px; }
+.la-dam-filter-head { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+.la-dam-counter { font-size: 0.76em; font-weight: 700; color: #d4a84e; }
+.la-dam-intent { padding: 5px 7px; font-size: 0.9em; color: #ddd5c9; background: rgba(196,151,60,0.05); border: 1px solid #2d2620; border-radius: 5px; overflow-wrap: anywhere; }
+.la-dam-intent-label { font-weight: 700; color: #d4a84e; }
 
 /* ── Thoughts Q&A cards ── */
-.la-qa-card { margin-top: 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid #2a2520; }
-.la-qa-odd { background: #1a1612; margin-right: 12px; }
-.la-qa-even { background: #1e1814; margin-left: 12px; }
-.la-qa-badge { display: inline-block; font-size: 0.75em; font-weight: 700; padding: 0 5px; border-radius: 3px; background: rgba(167,139,250,0.15); color: #a78bfa; border: 1px solid #a78bfa; margin-bottom: 3px; }
-.la-qa-question { font-size: 0.92em; font-weight: 700; color: #e8d5a0; margin-bottom: 2px; }
-.la-qa-answer { font-size: 0.92em; color: #c4bcb0; }
-
-/* ── Inventory fields ── */
-.la-inv-field { margin-top: 3px; font-size: 0.92em; }
-.la-inv-field-label { font-weight: 700; color: #c4973c; }
-.la-inv-field-value { color: #c4bcb0; }
-.la-inv-detail { margin-top: 3px; font-size: 0.92em; }
-.la-inv-detail-label { font-weight: 700; color: #c4973c; }
-
-/* ── Notebook entries ── */
-.la-notebook-entry .la-card-body { padding: 4px 8px; }
-
-/* ── Vexa GFX rendered content ── */
-.la-vexa-gfx { min-width: 0; }
-.la-vexa-gfx details { margin-bottom: 4px; }
-.la-vexa-gfx summary { cursor: pointer; }
-.la-vexa-gfx .ist-wrap { font-size: 0.92em; }
-.la-vexa-gfx .ist-wrap .ist-panel { padding: 4px; }
-.la-vexa-gfx .ist-wrap .ist-card { margin-bottom: 3px; }
-.la-vexa-gfx .ist-wrap .ist-badge { font-size: 0.75em; }
-.la-vexa-gfx .ist-wrap .ist-k { font-weight: 600; color: var(--ist-muted, #8a8078); }
-.la-vexa-gfx .ist-wrap .ist-v { color: var(--ist-text, #c4bcb0); }
-
-/* ── Location cards (Rendered style) ── */
-.la-location-card {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 8px; margin-bottom: 3px;
-  border: 1px solid #2a2520; border-radius: 6px;
-  background: #1a1612;
-  border-left: 2px solid #c4973c;
-}
-.la-location-icon { font-size: 1em; }
-.la-location-name { font-weight: 700; font-size: 0.92em; color: #e0d8cc; flex: 1; }
-.la-location-id { font-family: monospace; font-size: 0.75em; color: #6a6058; }
-.la-location-badge {
-  font-size: 0.75em; font-weight: 600;
-  padding: 0 5px; border-radius: 3px;
-  background: rgba(196,151,60,0.1); border: 1px solid #c4973c;
-  color: #d4b44e;
-}
+.la-qa-card { padding: 6px 8px; border-radius: 6px; border: 1px solid #2d2620; display: flex; flex-direction: column; gap: 3px; }
+.la-qa-odd { background: #14110e; margin-right: 10px; }
+.la-qa-even { background: #1d1713; margin-left: 10px; }
+.la-qa-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.la-qa-badge { display: inline-block; font-size: 0.74em; font-weight: 700; padding: 0 5px; border-radius: 999px; background: rgba(167,139,250,0.16); color: #c4b5fd; border: 1px solid #a78bfa; flex: none; }
+.la-qa-question { font-size: 0.9em; font-weight: 700; color: #eed89c; }
+.la-qa-answer { font-size: 0.92em; color: #e2dad0; white-space: normal; overflow-wrap: anywhere; }
 
 /* ── Map section ── */
 .la-map-controls { display: flex; gap: 4px; padding: 5px 8px; flex-wrap: wrap; align-items: center; }
@@ -413,8 +412,6 @@ function readInternalSnapshot(raw: unknown): InternalSnapshot | null {
   return { sections, ledger: typeof value.ledger === 'string' ? value.ledger : undefined }
 }
 
-const LEDGER_ELEMENT = /^(?:(?:[\w.-]+:)?(?:details|ledger|activation)|ledger:[\w.-]+)$/i
-
 function formatStateText(raw: string, omitLedger = false): string {
   const input = raw.trim()
   if (!input || /<!\s*(?:DOCTYPE|ENTITY)/i.test(input)) return input
@@ -469,469 +466,6 @@ function revealedLedger(raw: string | undefined): string | null {
     return formatStateText(raw)
   } catch {
     return null
-  }
-}
-
-/* ── Parse state section into structured records ── */
-interface StateRecord {
-  name: string
-  badge?: string
-  location?: string
-  fields: Array<{ label: string; value: string }>
-  details: Array<{ title: string; text: string }>
-  rawText: string
-}
-
-/* ── Vexa GFX regex renderer ── */
-// Fetches active display regexes from Lumiverse and applies them to state XML
-
-interface RegexScript {
-  findRegex: string
-  replaceString: string
-  flags: string
-  sortOrder: number
-}
-
-let cachedRegexScripts: RegexScript[] | null = null
-let regexFetchPromise: Promise<RegexScript[]> | null = null
-
-async function fetchDisplayRegexes(ctx: SpindleFrontendContext): Promise<RegexScript[]> {
-  if (cachedRegexScripts) return cachedRegexScripts
-  if (regexFetchPromise) return regexFetchPromise
-  regexFetchPromise = (async () => {
-    try {
-      // Request regex scripts from the backend via a custom message
-      const reqId = `la_regex_${Date.now()}`
-      return await new Promise<RegexScript[]>((resolve) => {
-        const handler = (raw: unknown) => {
-          const msg = raw as { type?: string; requestId?: string; scripts?: RegexScript[] }
-          if (msg.type === 'regex_scripts' && msg.requestId === reqId) {
-            resolve(msg.scripts ?? [])
-            cachedRegexScripts = msg.scripts ?? []
-          }
-        }
-        const unsub = ctx.onBackendMessage(handler)
-        ctx.sendToBackend({ type: 'get_regex_scripts', requestId: reqId } as never)
-        // Timeout after 2s
-        setTimeout(() => { unsub(); resolve([]) }, 2000)
-      })
-    } catch {
-      return []
-    } finally {
-      regexFetchPromise = null
-    }
-  })()
-  return regexFetchPromise
-}
-
-function applyRegexScripts(input: string, scripts: RegexScript[]): string {
-  let result = input
-  // Sort by sortOrder ascending (same as Lumiverse)
-  const sorted = [...scripts].sort((a, b) => a.sortOrder - b.sortOrder)
-  for (const script of sorted) {
-    try {
-      const re = new RegExp(script.findRegex, script.flags)
-      result = result.replace(re, script.replaceString)
-    } catch { /* skip invalid regex */ }
-  }
-  return result
-}
-
-/* ── Section-specific renderers ── */
-// Forward declaration for the refresh callback used by collapsible cards
-let refreshStateContent: () => void = () => {}
-
-function renderFlatList(raw: string, container: HTMLElement, sectionColor: string): void {
-  const records = parseStateRecords(raw)
-  for (const record of records) {
-    const card = el('div', 'la-card')
-    const head = el('div', 'la-card-head la-flat')
-    const dot = el('span', 'la-card-dot')
-    dot.style.background = sectionColor
-    const name = el('span', 'la-card-name', record.name)
-    head.append(dot, name)
-    if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
-    card.append(head)
-    const body = el('div', 'la-card-body')
-    if (record.location) body.append(el('div', 'la-card-location', `→ ${record.location}`))
-    if (record.fields.length) {
-      const fields = el('div', 'la-card-fields')
-      for (const field of record.fields) {
-        const fieldEl = el('div', 'la-card-field')
-        fieldEl.append(el('span', 'la-card-field-label', field.label))
-        fieldEl.append(el('span', 'la-card-field-value', field.value))
-        fields.append(fieldEl)
-      }
-      body.append(fields)
-    }
-    if (record.details.length) {
-      for (const detail of record.details) {
-        const detailEl = el('div', 'la-card-detail')
-        detailEl.append(el('div', 'la-card-detail-title', detail.title))
-        detailEl.append(el('div', 'la-card-detail-text', detail.text))
-        body.append(detailEl)
-      }
-    }
-    if (record.rawText && !record.fields.length && !record.details.length) {
-      body.append(el('div', 'la-card-detail-text', record.rawText))
-    }
-    card.append(body)
-    container.append(card)
-  }
-}
-
-function renderCollapsibleCards(raw: string, container: HTMLElement, sectionColor: string, expandedCards: Set<string>, sectionId: string): void {
-  const records = parseStateRecords(raw)
-  for (const record of records) {
-    const cardId = `${sectionId}:${record.name}`
-    const isExpanded = expandedCards.has(cardId)
-    const card = el('div', 'la-card')
-    const head = el('div', `la-card-head${isExpanded ? ' la-expanded' : ''}`)
-    const chevron = el('span', 'la-card-chevron', isExpanded ? '▾' : '▸')
-    const dot = el('span', 'la-card-dot')
-    dot.style.background = sectionColor
-    const name = el('span', 'la-card-name', record.name)
-    head.append(chevron, dot, name)
-    if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
-    card.append(head)
-    if (isExpanded) {
-      const body = el('div', 'la-card-body')
-      if (record.location) body.append(el('div', 'la-card-location', `→ ${record.location}`))
-      if (record.fields.length) {
-        const fields = el('div', 'la-card-fields')
-        for (const field of record.fields) {
-          const fieldEl = el('div', 'la-card-field')
-          fieldEl.append(el('span', 'la-card-field-label', field.label))
-          fieldEl.append(el('span', 'la-card-field-value', field.value))
-          fields.append(fieldEl)
-        }
-        body.append(fields)
-      }
-      if (record.details.length) {
-        for (const detail of record.details) {
-          const detailEl = el('div', 'la-card-detail')
-          detailEl.append(el('div', 'la-card-detail-title', detail.title))
-          detailEl.append(el('div', 'la-card-detail-text', detail.text))
-          body.append(detailEl)
-        }
-      }
-      if (record.rawText && !record.fields.length && !record.details.length) {
-        body.append(el('div', 'la-card-detail-text', record.rawText))
-      }
-      card.append(body)
-    }
-    head.addEventListener('click', () => {
-      if (expandedCards.has(cardId)) expandedCards.delete(cardId)
-      else expandedCards.add(cardId)
-      refreshStateContent()
-    })
-    container.append(card)
-  }
-}
-
-/* ── Pair metrics bar renderer ── */
-function renderPairMetrics(raw: string, container: HTMLElement): void {
-  const records = parseStateRecords(raw)
-  for (const record of records) {
-    const card = el('div', 'la-card')
-    const head = el('div', 'la-card-head')
-    const chevron = el('span', 'la-card-chevron', '▾')
-    const icon = el('span', undefined, '💚')
-    const name = el('span', 'la-card-name', record.name)
-    const badge = el('span', 'la-card-badge', record.badge || 'PAIR')
-    head.append(chevron, icon, name, badge)
-    card.append(head)
-    const body = el('div', 'la-card-body')
-    // Parse pair-specific fields for bidirectional bars
-    const pairFields: Array<{ left: string; leftVal: string; right: string; rightVal: string }> = []
-    for (const field of record.fields) {
-      const match = field.value.match(/^(.+?)\s*(\d+)\s*acc\s*(\d+)$/i)
-      if (match) {
-        pairFields.push({ left: field.label, leftVal: match[2], right: field.label, rightVal: match[2] })
-      } else {
-        const fieldEl = el('div', 'la-card-field')
-        fieldEl.append(el('span', 'la-card-field-label', field.label))
-        fieldEl.append(el('span', 'la-card-field-value', field.value))
-        body.append(fieldEl)
-      }
-    }
-    // Render metric bars
-    if (pairFields.length) {
-      const bars = el('div', 'la-pair-bars')
-      for (const pf of pairFields) {
-        const barRow = el('div', 'la-pair-bar-row')
-        const leftLabel = el('span', 'la-pair-bar-label la-pair-left', pf.left)
-        const leftBar = el('div', 'la-pair-bar la-pair-bar-left')
-        const leftFill = el('div', 'la-pair-bar-fill')
-        leftFill.style.width = `${Math.min(100, parseInt(pf.leftVal) * 8)}%`
-        leftBar.append(leftFill)
-        const rightBar = el('div', 'la-pair-bar la-pair-bar-right')
-        const rightFill = el('div', 'la-pair-bar-fill')
-        rightFill.style.width = `${Math.min(100, parseInt(pf.rightVal) * 8)}%`
-        rightBar.append(rightFill)
-        const rightLabel = el('span', 'la-pair-bar-label la-pair-right', pf.right)
-        barRow.append(leftLabel, leftBar, rightBar, rightLabel)
-        bars.append(barRow)
-      }
-      body.append(bars)
-    }
-    for (const detail of record.details) {
-      const detailEl = el('div', 'la-card-detail')
-      detailEl.append(el('div', 'la-card-detail-title', detail.title))
-      detailEl.append(el('div', 'la-card-detail-text', detail.text))
-      body.append(detailEl)
-    }
-    card.append(body)
-    container.append(card)
-  }
-}
-
-/* ── Dams SLUICES/FLAGS/FILTERS renderer ── */
-function renderDams(raw: string, container: HTMLElement): void {
-  const records = parseStateRecords(raw)
-  for (const record of records) {
-    const card = el('div', 'la-card')
-    const head = el('div', 'la-card-head')
-    const chevron = el('span', 'la-card-chevron', '▾')
-    const icon = el('span', undefined, '🪵')
-    const name = el('span', 'la-card-name', record.name)
-    const badge = el('span', 'la-card-badge', record.badge || 'DIRECTIONAL')
-    head.append(chevron, icon, name, badge)
-    card.append(head)
-    const body = el('div', 'la-card-body')
-    // Group fields into SLUICES, FLAGS, FILTERS, INTENT
-    const sluices: Array<{ label: string; value: string }> = []
-    const flags: Array<{ label: string; value: string }> = []
-    const filters: Array<{ label: string; value: string }> = []
-    let intent = ''
-    for (const field of record.fields) {
-      const l = field.label.toUpperCase()
-      if (l.includes('SLUICE') || l === 'E' || l === 'L' || l === 'EMOTION' || l === 'LANGUAGE') {
-        sluices.push(field)
-      } else if (l.includes('FLAG') || l === 'CLASH' || l === 'TENSION') {
-        flags.push(field)
-      } else if (l.includes('FILTER') || l === 'SOCIAL' || l === 'VALUES' || l === 'COMPETENCE' || l === 'RELATIONSHIP') {
-        filters.push(field)
-      } else if (l.includes('INTENT')) {
-        intent = field.value
-      } else {
-        const fieldEl = el('div', 'la-card-field')
-        fieldEl.append(el('span', 'la-card-field-label', field.label))
-        fieldEl.append(el('span', 'la-card-field-value', field.value))
-        body.append(fieldEl)
-      }
-    }
-    // SLUICES toggles
-    if (sluices.length) {
-      const sluiceBox = el('div', 'la-dam-section')
-      sluiceBox.append(el('div', 'la-dam-section-title', 'SLUICES'))
-      for (const s of sluices) {
-        const row = el('div', 'la-dam-toggle-row')
-        row.append(el('span', 'la-dam-toggle-label', s.label))
-        const val = el('span', `la-dam-toggle-val ${s.value.toLowerCase().includes('open') ? 'la-dam-open' : 'la-dam-sealed'}`, s.value)
-        row.append(val)
-        sluiceBox.append(row)
-      }
-      body.append(sluiceBox)
-    }
-    // FLAGS toggles
-    if (flags.length) {
-      const flagBox = el('div', 'la-dam-section')
-      flagBox.append(el('div', 'la-dam-section-title', 'FLAGS'))
-      for (const f of flags) {
-        const row = el('div', 'la-dam-toggle-row')
-        row.append(el('span', 'la-dam-toggle-label', f.label))
-        const val = el('span', `la-dam-toggle-val ${f.value.toLowerCase().includes('yes') ? 'la-dam-yes' : 'la-dam-no'}`, f.value)
-        row.append(val)
-        flagBox.append(row)
-      }
-      body.append(flagBox)
-    }
-    // FILTERS grid
-    if (filters.length) {
-      const filterBox = el('div', 'la-dam-section')
-      filterBox.append(el('div', 'la-dam-section-title', 'FILTERS'))
-      const grid = el('div', 'la-dam-filter-grid')
-      for (const f of filters) {
-        const cell = el('div', 'la-dam-filter-cell')
-        cell.append(el('div', 'la-dam-filter-name', f.label))
-        cell.append(el('div', `la-dam-filter-val ${f.value.toLowerCase().includes('crack') ? 'la-dam-crack' : f.value.toLowerCase().includes('hard') ? 'la-dam-hard' : 'la-dam-open'}`, f.value))
-        grid.append(cell)
-      }
-      filterBox.append(grid)
-      body.append(filterBox)
-    }
-    // INTENT
-    if (intent) {
-      const intentEl = el('div', 'la-dam-intent')
-      intentEl.append(el('span', undefined, '🎯 '), el('span', 'la-dam-intent-label', 'INTENT: '), el('span', undefined, intent))
-      body.append(intentEl)
-    }
-    for (const detail of record.details) {
-      const detailEl = el('div', 'la-card-detail')
-      detailEl.append(el('div', 'la-card-detail-title', detail.title))
-      detailEl.append(el('div', 'la-card-detail-text', detail.text))
-      body.append(detailEl)
-    }
-    card.append(body)
-    container.append(card)
-  }
-}
-
-/* ── Thoughts Q&A renderer ── */
-function renderThoughts(raw: string, container: HTMLElement): void {
-  const records = parseStateRecords(raw)
-  for (const record of records) {
-    const card = el('div', 'la-card')
-    const head = el('div', 'la-card-head')
-    const chevron = el('span', 'la-card-chevron', '▾')
-    const icon = el('span', undefined, '💭')
-    const name = el('span', 'la-card-name', record.name)
-    const badge = el('span', 'la-card-badge', record.badge || 'BTS INTERVIEW')
-    head.append(chevron, icon, name, badge)
-    card.append(head)
-    const body = el('div', 'la-card-body')
-    // Parse Q&A from details
-    let qNum = 0
-    for (const detail of record.details) {
-      qNum++
-      const qa = el('div', `la-qa-card ${qNum % 2 === 0 ? 'la-qa-even' : 'la-qa-odd'}`)
-      const qBadge = el('span', 'la-qa-badge', `Q${qNum}`)
-      const qText = el('div', 'la-qa-question', detail.title)
-      const aText = el('div', 'la-qa-answer', detail.text)
-      qa.append(qBadge, qText, aText)
-      body.append(qa)
-    }
-    if (record.rawText && !record.details.length) {
-      body.append(el('div', 'la-card-detail-text', record.rawText))
-    }
-    card.append(body)
-    container.append(card)
-  }
-}
-
-/* ── Inventory labeled sections renderer ── */
-function renderInventory(raw: string, container: HTMLElement): void {
-  const records = parseStateRecords(raw)
-  for (const record of records) {
-    const card = el('div', 'la-card')
-    const head = el('div', 'la-card-head la-flat')
-    const dot = el('span', 'la-card-dot')
-    dot.style.background = '#a3a3a3'
-    const name = el('span', 'la-card-name', record.name)
-    head.append(dot, name)
-    card.append(head)
-    const body = el('div', 'la-card-body')
-    // Show all fields and details as full text
-    for (const field of record.fields) {
-      const fieldEl = el('div', 'la-inv-field')
-      fieldEl.append(el('span', 'la-inv-field-label', `${field.label}: `))
-      fieldEl.append(el('span', 'la-inv-field-value', field.value))
-      body.append(fieldEl)
-    }
-    for (const detail of record.details) {
-      const detailEl = el('div', 'la-inv-detail')
-      detailEl.append(el('span', 'la-inv-detail-label', `${detail.title}: `))
-      detailEl.append(el('span', undefined, detail.text))
-      body.append(detailEl)
-    }
-    if (record.rawText && !record.fields.length && !record.details.length) {
-      body.append(el('div', 'la-card-detail-text', record.rawText))
-    }
-    card.append(body)
-    container.append(card)
-  }
-}
-
-/* ── Notebook entries renderer ── */
-function renderNotebook(raw: string, container: HTMLElement): void {
-  const records = parseStateRecords(raw)
-  for (const record of records) {
-    const card = el('div', 'la-card la-notebook-entry')
-    const head = el('div', 'la-card-head la-flat')
-    const dot = el('span', 'la-card-dot')
-    dot.style.background = '#a3a3a3'
-    const name = el('span', 'la-card-name', record.name)
-    head.append(dot, name)
-    if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
-    card.append(head)
-    const body = el('div', 'la-card-body')
-    if (record.rawText) {
-      body.append(el('div', 'la-card-detail-text', record.rawText))
-    }
-    for (const field of record.fields) {
-      body.append(el('div', 'la-card-detail-text', `${field.label}: ${field.value}`))
-    }
-    for (const detail of record.details) {
-      body.append(el('div', 'la-card-detail-text', `${detail.title}: ${detail.text}`))
-    }
-    card.append(body)
-    container.append(card)
-  }
-}
-
-function parseStateRecords(raw: string): StateRecord[] {
-  const input = raw.trim()
-  if (!input) return []
-  try {
-    const parser = new window.DOMParser()
-    const parsed = parser.parseFromString(`<root xmlns:state="urn:lumi-atlas:state">${input}</root>`, 'application/xml')
-    if (parsed.querySelector('parsererror')) return [{ name: 'Raw', fields: [], details: [], rawText: input }]
-    const records: StateRecord[] = []
-    const root = parsed.documentElement
-    const stateEl = Array.from(root.children).find(el => el.tagName.startsWith('state:') && !LEDGER_ELEMENT.test(el.tagName))
-    if (!stateEl) {
-      const anyState = Array.from(root.children).find(el => el.tagName.startsWith('state:'))
-      if (anyState && LEDGER_ELEMENT.test(anyState.tagName)) return []
-      return [{ name: 'Raw', fields: [], details: [], rawText: input }]
-    }
-
-    const children = Array.from(stateEl.children).filter(el => !LEDGER_ELEMENT.test(el.tagName))
-    if (!children.length) {
-      const clone = stateEl.cloneNode(true) as Element
-      for (const el of Array.from(clone.querySelectorAll('*'))) {
-        if (LEDGER_ELEMENT.test(el.tagName)) el.remove()
-      }
-      const text = clone.textContent?.trim()
-      return text ? [{ name: stateEl.tagName.replace(/^state:/, ''), fields: [], details: [], rawText: text }] : []
-    }
-
-    for (const record of children) {
-      const fields: StateRecord['fields'] = []
-      const details: StateRecord['details'] = []
-      let name = record.tagName.replace(/_/g, ' ')
-      let badge: string | undefined
-      let location: string | undefined
-
-      for (const child of Array.from(record.children)) {
-        if (LEDGER_ELEMENT.test(child.tagName)) continue
-        const label = child.tagName.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2')
-        const value = child.textContent?.trim() ?? ''
-        if (!value) continue
-
-        if (child.tagName === 'name' || child.tagName === 'names' || child.tagName === 'pair') {
-          name = value
-        } else if (child.tagName === 'loc' || child.tagName === 'location') {
-          location = value
-        } else if (['mode', 'standing', 'status', 'salience', 'sig'].includes(child.tagName)) {
-          badge = child.tagName === 'sig' ? `SIG ${value}` : value
-        } else if (['agenda', 'why', 'goal', 'end', 'move', 'parrott', 'residualMood', 'tfdy'].includes(child.tagName)) {
-          details.push({ title: child.tagName.toUpperCase(), text: value })
-        } else {
-          fields.push({ label, value })
-        }
-      }
-
-      if (name === record.tagName.replace(/_/g, ' ') && !record.children.length) {
-        name = record.textContent?.trim() ?? name
-      }
-
-      records.push({ name, badge, location, fields, details, rawText: '' })
-    }
-
-    return records.length ? records : [{ name: 'Data', fields: [], details: [], rawText: formatStateText(input) }]
-  } catch {
-    return [{ name: 'Raw', fields: [], details: [], rawText: input }]
   }
 }
 
@@ -1583,7 +1117,7 @@ export function setup(ctx: SpindleFrontendContext) {
     // Extract time, date, location, weather from world section
     const extract = (tag: string): string => {
       const match = world.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i'))
-      return match?.[1]?.trim() ?? ''
+      return (match?.[1] ?? '').replace(/\u2800+/g, ' ').replace(/[ \t]+/g, ' ').trim()
     }
     const time = extract('time')
     const date = extract('date')
@@ -1595,8 +1129,7 @@ export function setup(ctx: SpindleFrontendContext) {
     if (weather) statusBar.append(el('span', 'la-status-badge', weather))
   }
 
-  // ── Render: State content with collapsible cards ──
-  refreshStateContent = renderStateContent
+  // ── Render: State content with native Vexa-style GFX ──
   function renderStateContent(): void {
     stateContent.replaceChildren()
     if (!state.activeChatId) {
@@ -1625,56 +1158,16 @@ export function setup(ctx: SpindleFrontendContext) {
       return
     }
 
-    // Try Vexa GFX regex rendering first
-    const vexaRendered = renderWithVexaRegex(raw, section.id)
-    if (vexaRendered) {
-      stateContent.append(vexaRendered)
-      return
-    }
-
-    // Fallback to built-in renderers
-    switch (section.id) {
-      case 'pair':
-        renderPairMetrics(raw, stateContent)
-        break
-      case 'dam':
-        renderDams(raw, stateContent)
-        break
-      case 'thoughts':
-        renderThoughts(raw, stateContent)
-        break
-      case 'inv':
-        renderInventory(raw, stateContent)
-        break
-      case 'notebook':
-        renderNotebook(raw, stateContent)
-        break
-      default:
-        if (section.collapsible) {
-          renderCollapsibleCards(raw, stateContent, section.color, state.expandedCards, section.id)
-        } else {
-          renderFlatList(raw, stateContent, section.color)
-        }
-        break
-    }
-  }
-
-  // ── Vexa GFX regex renderer ──
-  function renderWithVexaRegex(raw: string, sectionId: string): HTMLElement | null {
-    if (!cachedRegexScripts || cachedRegexScripts.length === 0) return null
-    try {
-      const html = applyRegexScripts(raw, cachedRegexScripts)
-      // If the regex didn't change anything, fall back to built-in rendering
-      if (html === raw) return null
-      const wrapper = document.createElement('div')
-      wrapper.className = 'la-vexa-gfx'
-      // Use textContent for safety, then parse as HTML for the styled output
-      // The regex scripts produce safe HTML (no script tags)
-      wrapper.innerHTML = html
-      return wrapper
-    } catch {
-      return null
-    }
+    renderStateSection({
+      sectionId: section.id,
+      sectionLabel: section.label,
+      sectionColor: section.color,
+      collapsible: section.collapsible,
+      raw,
+      container: stateContent,
+      expandedCards: state.expandedCards,
+      onToggle: renderStateContent,
+    })
   }
 
   // ── Render: Sidebar active state ──
@@ -2067,8 +1560,6 @@ export function setup(ctx: SpindleFrontendContext) {
 
   renderAll()
   requestInit()
-  // Fetch Vexa GFX regexes in background after a short delay (non-blocking)
-  setTimeout(() => { void fetchDisplayRegexes(ctx) }, 100)
 
   return () => {
     state.destroyed = true

@@ -177,6 +177,998 @@ function connectorSegment(a, b) {
   return [ax, ay, bx, by];
 }
 
+// src/state-renderer.ts
+var LEDGER_ELEMENT = /^(?:(?:[\w.-]+:)?(?:details|ledger|activation)|ledger:[\w.-]+)$/i;
+var BRAILLE_SPACE = /\u2800+/g;
+function normText(raw) {
+  if (!raw)
+    return "";
+  return raw.replace(BRAILLE_SPACE, " ").replace(/[ \t]+/g, " ").trim();
+}
+function isEmptyVal(val) {
+  const t = normText(val);
+  return !t || t === "∅" || t === "Ø" || t === "—" || t === "-";
+}
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className)
+    node.className = className;
+  if (text !== undefined)
+    node.textContent = text;
+  return node;
+}
+function parseSectionXml(raw) {
+  const input = raw.trim();
+  if (!input || /<!\s*(?:DOCTYPE|ENTITY)/i.test(input))
+    return { root: null, blocked: false };
+  try {
+    const parser = new window.DOMParser;
+    const parsed = parser.parseFromString(`<root xmlns:state="urn:lumi-atlas:state">${input}</root>`, "application/xml");
+    if (parsed.querySelector("parsererror"))
+      return { root: null, blocked: false };
+    const root = parsed.documentElement;
+    const stateEl = Array.from(root.children).find((c) => c.tagName.startsWith("state:"));
+    if (stateEl && LEDGER_ELEMENT.test(stateEl.tagName))
+      return { root: null, blocked: true };
+    const target = stateEl ?? root;
+    const clone = target.cloneNode(true);
+    for (const node of Array.from(clone.querySelectorAll("*"))) {
+      if (LEDGER_ELEMENT.test(node.tagName))
+        node.remove();
+    }
+    return { root: clone, blocked: false };
+  } catch {
+    return { root: null, blocked: false };
+  }
+}
+function childText(parent, tag) {
+  for (const child of Array.from(parent.children)) {
+    if (child.tagName.toLowerCase() === tag.toLowerCase()) {
+      return normText(child.textContent);
+    }
+  }
+  return "";
+}
+function childrenByTag(parent, tag) {
+  const lower = tag.toLowerCase();
+  return Array.from(parent.children).filter((c) => c.tagName.toLowerCase() === lower);
+}
+function makeCollapsibleCard(opts, buildBody) {
+  const isExpanded = opts.expandedCards.has(opts.cardId);
+  const card = el("div", `la-card${isExpanded ? " la-card-open" : ""}`);
+  const head = el("div", `la-card-head${isExpanded ? " la-expanded" : ""}`);
+  head.setAttribute("role", "button");
+  head.setAttribute("tabindex", "0");
+  head.setAttribute("aria-expanded", String(isExpanded));
+  const chevron = el("span", "la-card-chevron", isExpanded ? "▾" : "▸");
+  const iconEl = el("span", "la-card-icon", opts.icon);
+  if (opts.accentColor)
+    iconEl.style.color = opts.accentColor;
+  const nameWrap = el("span", "la-card-name");
+  nameWrap.append(document.createTextNode(opts.title));
+  if (opts.titleCode) {
+    nameWrap.append(document.createTextNode(" "), el("code", "la-loc-id", opts.titleCode));
+  }
+  head.append(chevron, iconEl, nameWrap);
+  if (opts.badge)
+    head.append(el("span", "la-card-badge", opts.badge));
+  card.append(head);
+  if (isExpanded) {
+    const body = el("div", "la-card-body");
+    buildBody(body);
+    card.append(body);
+  }
+  const toggle = () => {
+    if (opts.expandedCards.has(opts.cardId))
+      opts.expandedCards.delete(opts.cardId);
+    else
+      opts.expandedCards.add(opts.cardId);
+    opts.onToggle();
+  };
+  head.addEventListener("click", toggle);
+  head.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      toggle();
+    }
+  });
+  return card;
+}
+function renderEmpty(container, label) {
+  container.append(el("p", "la-subtitle", `No ${label.toLowerCase()} data available.`));
+}
+function renderWorld(root, container) {
+  const ct = childText(root, "ct");
+  const loc = childText(root, "loc");
+  const time = childText(root, "time");
+  const date = childText(root, "date");
+  const weather = childText(root, "weather");
+  const room = childText(root, "room");
+  const userPos = childText(root, "user_pos");
+  const entries = childText(root, "entries");
+  const obstacles = childText(root, "obstacles");
+  const audio = childText(root, "audio");
+  const pacing = childText(root, "pacing");
+  if (!ct && !loc && !time && !room && !userPos && !entries && !obstacles && !audio && !pacing) {
+    return false;
+  }
+  const hud = el("div", "la-world-hud");
+  if (ct || loc || time || date || weather || pacing) {
+    const bar = el("div", "la-world-bar");
+    if (ct)
+      bar.append(el("span", "la-world-pill la-world-ct", `CT ${ct}`));
+    if (time)
+      bar.append(el("span", "la-world-pill", `\uD83D\uDD50 ${time}`));
+    if (date)
+      bar.append(el("span", "la-world-pill", `\uD83D\uDCC5 ${date}`));
+    if (loc)
+      bar.append(el("span", "la-world-pill", `\uD83D\uDCCD ${loc}`));
+    if (weather)
+      bar.append(el("span", "la-world-pill", `\uD83C\uDF25 ${weather}`));
+    if (pacing)
+      bar.append(el("span", "la-world-pill la-world-pacing", `⏱ ${pacing}`));
+    hud.append(bar);
+  }
+  const addPanel = (icon, label, val, highlight = false) => {
+    if (!val)
+      return;
+    const box = el("div", `la-flat-panel${highlight ? " la-flat-highlight" : ""}`);
+    box.append(el("div", "la-flat-badge", `${icon} ${label}`));
+    box.append(el("div", "la-flat-text", val));
+    hud.append(box);
+  };
+  addPanel("\uD83D\uDC64", "POSITION", userPos, true);
+  addPanel("\uD83C\uDFA8", "ROOM", room);
+  addPanel("\uD83D\uDEAA", "ENTRIES", entries);
+  addPanel("\uD83E\uDDF1", "OBSTACLES", obstacles);
+  addPanel("\uD83D\uDD0A", "AUDIO", audio);
+  const known = new Set(["ct", "loc", "time", "date", "weather", "room", "user_pos", "entries", "obstacles", "audio", "pacing"]);
+  for (const child of Array.from(root.children)) {
+    if (known.has(child.tagName.toLowerCase()))
+      continue;
+    const val = normText(child.textContent);
+    if (val)
+      addPanel("•", child.tagName.replace(/_/g, " ").toUpperCase(), val);
+  }
+  container.append(hud);
+  return true;
+}
+function renderOnScreen(root, container, expandedCards, onToggle) {
+  const entries = childrenByTag(root, "ent_on");
+  if (!entries.length) {
+    const t = normText(root.textContent);
+    if (isEmptyVal(t)) {
+      container.append(el("p", "la-subtitle", "Nobody else on-screen right now."));
+      return true;
+    }
+    return false;
+  }
+  for (const entry of entries) {
+    const name = childText(entry, "name") || "Character";
+    const sal = childText(entry, "salience").replace(/^sal:\s*/i, "");
+    const parrott = childText(entry, "parrott");
+    const residual = childText(entry, "residualMood");
+    const tfdy = childText(entry, "tfdy");
+    const agenda = childText(entry, "agenda");
+    const why = childText(entry, "why");
+    const end = childText(entry, "end");
+    const move = childText(entry, "move");
+    const card = makeCollapsibleCard({
+      cardId: `onscreen:${name}`,
+      icon: "\uD83D\uDC64",
+      title: name,
+      badge: sal ? `SAL ${sal}` : undefined,
+      accentColor: "#c084fc",
+      expandedCards,
+      onToggle
+    }, (body) => {
+      if (parrott || tfdy) {
+        const bar = el("div", "la-meta-bar");
+        if (parrott)
+          bar.append(el("span", "la-meta-chip", parrott));
+        if (tfdy)
+          bar.append(el("span", "la-meta-chip la-meta-mono", tfdy));
+        body.append(bar);
+      }
+      if (residual)
+        body.append(el("div", "la-card-subtext", residual));
+      for (const [k, v] of [
+        ["AGENDA", agenda],
+        ["WHY", why],
+        ["END", end],
+        ["MOVE", move]
+      ]) {
+        if (!v)
+          continue;
+        const row = el("div", "la-card-detail");
+        row.append(el("div", "la-card-detail-title", k), el("div", "la-card-detail-text", v));
+        body.append(row);
+      }
+    });
+    container.append(card);
+  }
+  return true;
+}
+function renderOffScreen(root, container, expandedCards, onToggle) {
+  const entries = childrenByTag(root, "ent_off");
+  if (!entries.length)
+    return false;
+  for (const entry of entries) {
+    const name = childText(entry, "name") || "Character";
+    const loc = childText(entry, "loc");
+    const sal = childText(entry, "salience").replace(/^sal:\s*/i, "");
+    const mood = childText(entry, "mood").replace(/^Parrot(?:Mood|Emotion):\s*/i, "");
+    const tfdy = childText(entry, "tfdy");
+    const agenda = childText(entry, "agenda");
+    const why = childText(entry, "why");
+    const goal = childText(entry, "goal");
+    const end = childText(entry, "end");
+    const card = makeCollapsibleCard({
+      cardId: `offscreen_agendas:${name}`,
+      icon: "\uD83C\uDF19",
+      title: name,
+      badge: sal ? `SIG ${sal}` : undefined,
+      accentColor: "#c4973c",
+      expandedCards,
+      onToggle
+    }, (body) => {
+      if (loc)
+        body.append(el("div", "la-card-location", `\uD83D\uDCCD ${loc}`));
+      if (mood || tfdy) {
+        const bar = el("div", "la-meta-bar");
+        if (mood)
+          bar.append(el("span", "la-meta-chip", mood));
+        if (tfdy)
+          bar.append(el("span", "la-meta-chip la-meta-mono", tfdy));
+        body.append(bar);
+      }
+      for (const [k, v] of [
+        ["AGENDA", agenda],
+        ["WHY", why],
+        ["GOAL", goal],
+        ["END", end]
+      ]) {
+        if (!v)
+          continue;
+        const row = el("div", "la-card-detail");
+        row.append(el("div", "la-card-detail-title", k), el("div", "la-card-detail-text", v));
+        body.append(row);
+      }
+    });
+    container.append(card);
+  }
+  return true;
+}
+function renderLocations(root, container, expandedCards, onToggle) {
+  const rendered = childrenByTag(root, "loc_rend");
+  const loaded = childrenByTag(root, "loc_load");
+  const all = [
+    ...rendered.map((node) => ({ node, kind: "Rendered", icon: "\uD83D\uDCCD" })),
+    ...loaded.map((node) => ({ node, kind: "Loaded", icon: "◌" }))
+  ];
+  if (!all.length)
+    return false;
+  for (const { node, kind, icon } of all) {
+    const id = childText(node, "id");
+    const name = childText(node, "name") || id || "Location";
+    const mapId = childText(node, "map_id");
+    const dim = childText(node, "dim");
+    const bbox = childText(node, "bbox");
+    const anchor = childText(node, "anchor");
+    const features = childText(node, "features");
+    const adj = childText(node, "adj");
+    const grid = childText(node, "grid");
+    const occupants = childText(node, "occupants");
+    const exits = childText(node, "exits");
+    const updated = childText(node, "updated");
+    const card = makeCollapsibleCard({
+      cardId: `locations:${id || name}`,
+      icon,
+      title: name,
+      titleCode: id || undefined,
+      badge: kind,
+      accentColor: kind === "Rendered" ? "#e86a6a" : "#8a8078",
+      expandedCards,
+      onToggle
+    }, (body) => {
+      const metaPairs = [
+        ["Map", mapId],
+        ["Dimensions", dim],
+        ["Grid", grid],
+        ["BBox", bbox],
+        ["Anchor", anchor]
+      ].filter(([, v]) => Boolean(v));
+      if (metaPairs.length) {
+        const gridEl = el("div", "la-kv-grid");
+        for (const [k, v] of metaPairs) {
+          const cell = el("div", "la-kv-cell");
+          cell.append(el("div", "la-kv-k", k), el("div", "la-kv-v", v));
+          gridEl.append(cell);
+        }
+        body.append(gridEl);
+      }
+      for (const [k, v] of [
+        ["FEATURES", features],
+        ["OCCUPANTS", occupants],
+        ["ADJACENT", adj],
+        ["DOORWAYS", exits]
+      ]) {
+        if (!v || isEmptyVal(v))
+          continue;
+        const row = el("div", "la-card-detail");
+        row.append(el("div", "la-card-detail-title", k), el("div", "la-card-detail-text", v));
+        body.append(row);
+      }
+      if (updated)
+        body.append(el("div", "la-card-footer", `Updated: ${updated}`));
+    });
+    container.append(card);
+  }
+  return true;
+}
+function renderEntityMemory(root, container, expandedCards, onToggle) {
+  const entries = childrenByTag(root, "ent_mem");
+  if (!entries.length)
+    return false;
+  for (const entry of entries) {
+    const name = childText(entry, "name") || "Entity";
+    const mems = childrenByTag(entry, "mem");
+    const card = makeCollapsibleCard({
+      cardId: `entityMem:${name}`,
+      icon: "\uD83E\uDDE0",
+      title: name,
+      badge: mems.length ? `${mems.length} mem` : "Knowledge",
+      accentColor: "#e86a8a",
+      expandedCards,
+      onToggle
+    }, (body) => {
+      for (const memEl of mems) {
+        const raw = normText(memEl.textContent);
+        if (!raw)
+          continue;
+        const match = raw.match(/^([\s\S]*?)\s*\|\s*T:\s*([^|]+?)\s*\|\s*V:\s*([^|]+?)\s*\|\s*C:\s*(.+)$/);
+        const item = el("div", "la-mem-entry");
+        if (match) {
+          item.append(el("div", "la-mem-fact", match[1].trim()));
+          const meta = el("div", "la-meta-bar");
+          meta.append(el("span", "la-meta-chip", `\uD83D\uDD50 ${match[2].trim()}`), el("span", "la-meta-chip", `\uD83D\uDC41 ${match[3].trim()}`), el("span", "la-meta-chip la-mem-cert", match[4].trim()));
+          item.append(meta);
+        } else {
+          item.append(el("div", "la-mem-fact", raw));
+        }
+        body.append(item);
+      }
+    });
+    container.append(card);
+  }
+  return true;
+}
+function renderEntityProfile(root, container, expandedCards, onToggle) {
+  const entries = childrenByTag(root, "ent_col");
+  if (!entries.length)
+    return false;
+  for (const entry of entries) {
+    const name = childText(entry, "name") || "Entity";
+    const fontColor = childText(entry, "fontColor");
+    const hexMatch = fontColor.match(/#[0-9a-fA-F]{6}/);
+    const swatchHex = hexMatch ? hexMatch[0] : undefined;
+    const look = childText(entry, "look");
+    const voice = childText(entry, "voice");
+    const persona = childText(entry, "persona");
+    const priv = childText(entry, "private");
+    const card = makeCollapsibleCard({
+      cardId: `entity_state:${name}`,
+      icon: "\uD83E\uDEAA",
+      title: name,
+      badge: "Profile",
+      accentColor: swatchHex ?? "#6a8ae8",
+      expandedCards,
+      onToggle
+    }, (body) => {
+      if (fontColor) {
+        const row = el("div", "la-color-row");
+        const dot = el("span", "la-color-swatch");
+        if (swatchHex)
+          dot.style.background = swatchHex;
+        row.append(dot, el("span", "la-kv-k", "Font color"), el("code", "la-loc-id", fontColor));
+        body.append(row);
+      }
+      for (const [k, v] of [
+        ["APPEARANCE", look],
+        ["VOICE", voice],
+        ["PERSONALITY", persona],
+        ["PRIVATE KNOWLEDGE", priv]
+      ]) {
+        if (!v)
+          continue;
+        const row = el("div", "la-card-detail");
+        row.append(el("div", "la-card-detail-title", k), el("div", "la-card-detail-text", v));
+        body.append(row);
+      }
+    });
+    container.append(card);
+  }
+  return true;
+}
+var THOUGHT_QUESTIONS = [
+  ["tQ1", "Q1", "What's your goal right now?"],
+  ["tQ2", "Q2", "How do you feel about what just happened?"],
+  ["tQ3", "Q3", "Where is your mind right now?"],
+  ["tQ4", "Q4", "Why do you care?"],
+  ["tQ5", "Q5", "If you could speak your mind right now, what would you actually say?"]
+];
+function renderThoughts(root, container, expandedCards, onToggle) {
+  const entries = childrenByTag(root, "ent_think");
+  if (!entries.length)
+    return false;
+  for (const entry of entries) {
+    const name = childText(entry, "name") || "Character";
+    const card = makeCollapsibleCard({
+      cardId: `thoughts:${name}`,
+      icon: "\uD83D\uDCAD",
+      title: name,
+      badge: "BTS INTERVIEW",
+      accentColor: "#a78bfa",
+      expandedCards,
+      onToggle
+    }, (body) => {
+      let idx = 0;
+      for (const [tag, qLabel, question] of THOUGHT_QUESTIONS) {
+        const answer = childText(entry, tag);
+        if (!answer)
+          continue;
+        idx++;
+        const qa = el("div", `la-qa-card ${idx % 2 === 0 ? "la-qa-even" : "la-qa-odd"}`);
+        const qHead = el("div", "la-qa-head");
+        qHead.append(el("span", "la-qa-badge", qLabel), el("span", "la-qa-question", question));
+        qa.append(qHead, el("div", "la-qa-answer", answer));
+        body.append(qa);
+      }
+    });
+    container.append(card);
+  }
+  return true;
+}
+function normalizeFilterCode(code) {
+  const c = code.trim().toLowerCase();
+  if (c === "h" || c === "hard")
+    return "HARD";
+  if (c === "c" || c === "crack" || c === "cracked")
+    return "CRACK";
+  if (c === "r" || c === "limit" || c === "restricted")
+    return "LIMIT";
+  if (c === "o" || c === "open")
+    return "OPEN";
+  return "";
+}
+function renderDams(root, container, expandedCards, onToggle) {
+  const entries = childrenByTag(root, "ent_dam");
+  if (!entries.length)
+    return false;
+  for (const entry of entries) {
+    const pair = childText(entry, "pair") || childText(entry, "name") || "Relationship";
+    const sluiceRaw = childText(entry, "sluice");
+    const filtersRaw = childText(entry, "filters");
+    const miscRaw = childText(entry, "misc");
+    const intentRaw = childText(entry, "intent").replace(/^intent:\s*/i, "");
+    const eSluice = sluiceRaw.match(/E:\s*([a-z-]+)/i)?.[1]?.toLowerCase() ?? "";
+    const lSluice = sluiceRaw.match(/L:\s*([a-z-]+)/i)?.[1]?.toLowerCase() ?? "";
+    const clashVal = miscRaw.match(/clash:\s*([^|\s]+)/i)?.[1]?.toLowerCase() ?? "";
+    const tensionVal = miscRaw.match(/T:\s*([^|\s]+)/i)?.[1]?.toLowerCase() ?? "";
+    const isClash = clashVal === "yes" || clashVal !== "" && clashVal !== "no" && clashVal !== "—" && clashVal !== "-" && clashVal !== "∅";
+    const isTension = tensionVal === "yes";
+    const parseFilter = (key) => {
+      const m = filtersRaw.match(new RegExp(`${key}:\\s*\\[?(hard|cracked|restricted|open|[hcro])\\]?\\s*((?:\\([^)]*\\)\\s*)*)`, "i"));
+      return {
+        state: m ? normalizeFilterCode(m[1]) : "",
+        note: m?.[2]?.trim() ?? ""
+      };
+    };
+    const filterItems = [
+      { name: "SOCIAL", ...parseFilter("Soc") },
+      { name: "VALUES", ...parseFilter("Val") },
+      { name: "COMPETENCE", ...parseFilter("Comp") },
+      { name: "RELATIONSHIP", ...parseFilter("Rel") }
+    ];
+    const card = makeCollapsibleCard({
+      cardId: `dam:${pair}`,
+      icon: "\uD83E\uDEB5",
+      title: pair,
+      badge: "DIRECTIONAL",
+      accentColor: "#c4973c",
+      expandedCards,
+      onToggle
+    }, (body) => {
+      const topRow = el("div", "la-dam-top");
+      const sluiceBox = el("div", "la-dam-block");
+      sluiceBox.append(el("div", "la-dam-block-title", "SLUICES"));
+      for (const [label, st] of [["E · EMOTION", eSluice], ["L · LANGUAGE", lSluice]]) {
+        const row = el("div", "la-dam-ctrl");
+        row.append(el("div", "la-dam-ctrl-name", label));
+        const opts = el("div", "la-dam-opts");
+        const isOpen = st === "open" || st === "o";
+        const isSealed = st === "sealed" || st === "s";
+        opts.append(el("span", `la-dam-opt${isSealed ? " la-opt-amber" : ""}`, "SEALED"), el("span", `la-dam-opt${isOpen ? " la-opt-green" : ""}`, "OPEN"));
+        row.append(opts);
+        sluiceBox.append(row);
+      }
+      topRow.append(sluiceBox);
+      const flagBox = el("div", "la-dam-block");
+      flagBox.append(el("div", "la-dam-block-title", "FLAGS"));
+      for (const [label, active] of [["CLASH", isClash], ["TENSION", isTension]]) {
+        const row = el("div", "la-dam-ctrl");
+        row.append(el("div", "la-dam-ctrl-name", label));
+        const opts = el("div", "la-dam-opts");
+        opts.append(el("span", `la-dam-opt${!active ? " la-opt-neutral" : ""}`, "NO"), el("span", `la-dam-opt${active ? " la-opt-red" : ""}`, "YES"));
+        row.append(opts);
+        flagBox.append(row);
+      }
+      topRow.append(flagBox);
+      body.append(topRow);
+      const filterBox = el("div", "la-dam-block");
+      filterBox.append(el("div", "la-dam-block-title", "FILTERS · HARD / CRACKED / RESTRICTED / OPEN"));
+      const grid = el("div", "la-dam-filter-grid");
+      for (const f of filterItems) {
+        const cell = el("div", "la-dam-filter-cell");
+        const head = el("div", "la-dam-filter-head");
+        head.append(el("span", "la-dam-ctrl-name", f.name));
+        if (f.note)
+          head.append(el("span", "la-dam-counter", f.note));
+        cell.append(head);
+        const opts = el("div", "la-dam-opts la-dam-opts-4");
+        for (const opt of ["HARD", "CRACK", "LIMIT", "OPEN"]) {
+          const activeClass = f.state !== opt ? "" : opt === "HARD" ? " la-opt-red" : opt === "CRACK" ? " la-opt-amber" : opt === "LIMIT" ? " la-opt-blue" : " la-opt-green";
+          opts.append(el("span", `la-dam-opt${activeClass}`, opt));
+        }
+        cell.append(opts);
+        grid.append(cell);
+      }
+      filterBox.append(grid);
+      body.append(filterBox);
+      if (intentRaw) {
+        const intentEl = el("div", "la-dam-intent");
+        intentEl.append(el("span", "la-dam-intent-label", "\uD83C\uDFAF INTENT "), el("span", "la-dam-intent-text", intentRaw));
+        body.append(intentEl);
+      }
+    });
+    container.append(card);
+  }
+  return true;
+}
+var PAIR_AXES = [
+  { negEmoji: "\uD83D\uDE20", negLabel: "Hatred", negColor: "#e87a6a", posEmoji: "\uD83C\uDF36️", posLabel: "Desire", posColor: "#f08868" },
+  { negEmoji: "\uD83E\uDD4A", negLabel: "Conflict", negColor: "#f08a9a", posEmoji: "\uD83C\uDFB2", posLabel: "Play", posColor: "#e8c44e" },
+  { negEmoji: "❄️", negLabel: "Hostility", negColor: "#7ec8f0", posEmoji: "\uD83E\uDD1D", posLabel: "Friendship", posColor: "#8aa8d8" },
+  { negEmoji: "\uD83E\uDEA8", negLabel: "Stagnation", negColor: "#a89cf0", posEmoji: "\uD83D\uDEE0️", posLabel: "Commitment", posColor: "#e8a84e" },
+  { negEmoji: "\uD83C\uDF2B️", negLabel: "Indifference", negColor: "#98a0a8", posEmoji: "\uD83C\uDFE0", posLabel: "Warmth", posColor: "#e8b878" },
+  { negEmoji: "\uD83D\uDC0D", negLabel: "Envy", negColor: "#88c888", posEmoji: "\uD83D\uDD4A️", posLabel: "Devotion", posColor: "#c8d8f0" }
+];
+function parseMatrixTokens(raw) {
+  const map = new Map;
+  const re = /([^\s\[\]]+)\s*\[\s*([+-]?\d+)\s*,\s*([^\]]+?)\s*\]/g;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    const key = m[1].replace(/\uFE0F/g, "");
+    map.set(key, { val: parseInt(m[2], 10) || 0, acc: m[3].trim() });
+  }
+  return map;
+}
+function renderPairs(root, container, expandedCards, onToggle) {
+  const entries = childrenByTag(root, "pair");
+  if (!entries.length)
+    return false;
+  for (const entry of entries) {
+    const names = childText(entry, "names") || childText(entry, "name") || "Pair";
+    const mode = childText(entry, "mode").replace(/^mode:\s*/i, "");
+    const damRaw = childText(entry, "dam");
+    const matrixRaw = childText(entry, "matrix");
+    const wallRaw = childText(entry, "wall").replace(/^wall:\s*/i, "");
+    const eVal = damRaw.match(/E:\s*([^\s]+)/i)?.[1];
+    const lVal = damRaw.match(/L:\s*([^\s]+)/i)?.[1];
+    const gateVal = damRaw.match(/Gate:\s*([^\s]+)/i)?.[1];
+    const tokens = parseMatrixTokens(matrixRaw);
+    const card = makeCollapsibleCard({
+      cardId: `pair:${names}`,
+      icon: "\uD83D\uDC9A",
+      title: names,
+      badge: mode || "PAIR",
+      accentColor: "#4ade80",
+      expandedCards,
+      onToggle
+    }, (body) => {
+      if (eVal || lVal || gateVal) {
+        const chips = el("div", "la-meta-bar");
+        if (eVal)
+          chips.append(el("span", "la-meta-chip", `E · ${eVal}`));
+        if (lVal)
+          chips.append(el("span", "la-meta-chip", `L · ${lVal}`));
+        if (gateVal)
+          chips.append(el("span", "la-meta-chip", `Gate · ${gateVal}`));
+        body.append(chips);
+      }
+      if (tokens.size > 0) {
+        const stack = el("div", "la-axis-stack");
+        for (const axis of PAIR_AXES) {
+          const neg = tokens.get(axis.negEmoji.replace(/\uFE0F/g, "")) ?? { val: 0, acc: "0" };
+          const pos = tokens.get(axis.posEmoji.replace(/\uFE0F/g, "")) ?? { val: 0, acc: "0" };
+          const row = el("div", "la-axis-row");
+          const labels = el("div", "la-axis-labels");
+          const leftLbl = el("span", "la-axis-side la-axis-neg");
+          leftLbl.style.color = axis.negColor;
+          leftLbl.append(document.createTextNode(`${axis.negEmoji} ${axis.negLabel} `), el("strong", undefined, String(neg.val)), el("small", "la-axis-acc", ` acc ${neg.acc}`));
+          const rightLbl = el("span", "la-axis-side la-axis-pos");
+          rightLbl.style.color = axis.posColor;
+          rightLbl.append(document.createTextNode(`${axis.posEmoji} ${axis.posLabel} `), el("strong", undefined, String(pos.val)), el("small", "la-axis-acc", ` acc ${pos.acc}`));
+          labels.append(leftLbl, rightLbl);
+          const track = el("div", "la-axis-track");
+          const negHalf = el("div", "la-axis-half la-axis-half-neg");
+          const negFill = el("div", "la-axis-fill");
+          negFill.style.width = `${Math.min(100, Math.max(0, neg.val) * 6.5)}%`;
+          negFill.style.background = axis.negColor;
+          negHalf.append(negFill);
+          const posHalf = el("div", "la-axis-half la-axis-half-pos");
+          const posFill = el("div", "la-axis-fill");
+          posFill.style.width = `${Math.min(100, Math.max(0, pos.val) * 6.5)}%`;
+          posFill.style.background = axis.posColor;
+          posHalf.append(posFill);
+          track.append(negHalf, el("div", "la-axis-center"), posHalf);
+          row.append(labels, track);
+          stack.append(row);
+        }
+        body.append(stack);
+      } else if (matrixRaw) {
+        body.append(el("div", "la-card-detail-text", matrixRaw));
+      }
+      if (wallRaw && !isEmptyVal(wallRaw)) {
+        body.append(el("div", "la-card-footer", `Wall: ${wallRaw}`));
+      }
+    });
+    container.append(card);
+  }
+  return true;
+}
+function renderTracks(root, container) {
+  const mains = childrenByTag(root, "main");
+  const tracks = childrenByTag(root, "track");
+  const histories = childrenByTag(root, "history");
+  if (!mains.length && !tracks.length && !histories.length)
+    return false;
+  for (const m of mains) {
+    const text = normText(m.textContent);
+    if (!text || isEmptyVal(text))
+      continue;
+    const box = el("div", "la-flat-panel la-flat-highlight");
+    box.append(el("div", "la-flat-badge", "\uD83E\uDDF5 MAIN TRACK"), el("div", "la-flat-text", text));
+    container.append(box);
+  }
+  for (const tr of tracks) {
+    const text = normText(tr.textContent);
+    if (!text || isEmptyVal(text))
+      continue;
+    const parts = text.split("|").map((s) => s.trim()).filter(Boolean);
+    const box = el("div", "la-flat-panel");
+    if (parts.length >= 2) {
+      const head = el("div", "la-flat-row-head");
+      head.append(el("span", "la-flat-title", parts[0]));
+      head.append(el("span", "la-card-badge", parts[1]));
+      box.append(head);
+      if (parts.length > 2)
+        box.append(el("div", "la-flat-text", parts.slice(2).join(" · ")));
+    } else {
+      box.append(el("div", "la-flat-text", text));
+    }
+    container.append(box);
+  }
+  for (const h of histories) {
+    const text = normText(h.textContent);
+    if (!text || isEmptyVal(text))
+      continue;
+    const box = el("div", "la-flat-panel");
+    box.append(el("div", "la-flat-badge", "\uD83D\uDCDC HISTORY"), el("div", "la-flat-text", text));
+    container.append(box);
+  }
+  if (!container.children.length)
+    renderEmpty(container, "tracks");
+  return true;
+}
+function renderArc(root, container) {
+  const fields = [
+    ["info", "ARC OVERVIEW"],
+    ["timeline", "TIMELINE"],
+    ["ki", "KI · 起"],
+    ["sho", "SHŌ · 承"],
+    ["ten", "TEN · 転"],
+    ["ketsu", "KETSU · 結"]
+  ];
+  let anyFound = false;
+  for (const [tag, label] of fields) {
+    const val = childText(root, tag);
+    if (!val || isEmptyVal(val))
+      continue;
+    anyFound = true;
+    const box = el("div", "la-flat-panel");
+    box.append(el("div", "la-flat-badge", label), el("div", "la-flat-text", val));
+    container.append(box);
+  }
+  if (!anyFound) {
+    if (childrenByTag(root, "info").length || childrenByTag(root, "ki").length) {
+      renderEmpty(container, "arc");
+      return true;
+    }
+    return false;
+  }
+  return true;
+}
+function renderChekhov(root, container) {
+  const groups = [
+    ["chamber", "◉ CHAMBER"],
+    ["locked", "\uD83D\uDD12 LOCKED"],
+    ["fired", "✦ FIRED THIS TURN"]
+  ];
+  let matched = false;
+  for (const [tag, title] of groups) {
+    const sec = childrenByTag(root, tag)[0];
+    if (!sec)
+      continue;
+    matched = true;
+    const bullets = childrenByTag(sec, "bullet");
+    const texts = bullets.length ? bullets.map((b) => normText(b.textContent)).filter((t) => !isEmptyVal(t)) : [normText(sec.textContent)].filter((t) => !isEmptyVal(t));
+    if (!texts.length)
+      continue;
+    const group = el("div", "la-flat-group");
+    group.append(el("div", "la-flat-group-title", title));
+    for (const t of texts) {
+      const item = el("div", "la-flat-panel");
+      item.append(el("div", "la-flat-text", t));
+      group.append(item);
+    }
+    container.append(group);
+  }
+  if (matched && !container.children.length)
+    renderEmpty(container, "chekhov");
+  return matched;
+}
+function renderLeads(root, container) {
+  const groups = [
+    ["active_leads", "\uD83D\uDCCC ACTIVE LEADS & JOBS"],
+    ["usable", "\uD83D\uDD11 CONTACTS, LEVERAGE & HOOKS"],
+    ["resolved_leads", "✓ RESOLVED THIS TURN"]
+  ];
+  let matched = false;
+  for (const [tag, title] of groups) {
+    const sec = childrenByTag(root, tag)[0];
+    if (!sec)
+      continue;
+    matched = true;
+    const leads = childrenByTag(sec, "lead");
+    const texts = leads.length ? leads.map((l) => normText(l.textContent)).filter((t) => !isEmptyVal(t)) : [normText(sec.textContent)].filter((t) => !isEmptyVal(t));
+    if (!texts.length)
+      continue;
+    const group = el("div", "la-flat-group");
+    group.append(el("div", "la-flat-group-title", title));
+    for (const t of texts) {
+      const parts = t.split("|").map((s) => s.trim()).filter(Boolean);
+      const item = el("div", "la-flat-panel");
+      if (parts.length >= 3) {
+        const head = el("div", "la-flat-row-head");
+        head.append(el("span", "la-flat-title", parts[0]), el("span", "la-flat-meta", `· ${parts[1]}`));
+        item.append(head, el("div", "la-flat-text", parts.slice(2).join(" | ")));
+      } else {
+        item.append(el("div", "la-flat-text", t));
+      }
+      group.append(item);
+    }
+    container.append(group);
+  }
+  if (matched && !container.children.length)
+    renderEmpty(container, "leads");
+  return matched;
+}
+function renderInventory(root, container) {
+  const slots = [
+    ["inv", "\uD83C\uDF92", "ITEMS"],
+    ["titles", "\uD83C\uDFF7️", "TRAITS"],
+    ["status", "♥", "STATUS"]
+  ];
+  let matched = false;
+  for (const [tag, icon, label] of slots) {
+    const val = childText(root, tag);
+    if (!val)
+      continue;
+    matched = true;
+    const box = el("div", "la-flat-panel");
+    box.append(el("div", "la-flat-badge", `${icon} ${label}`), el("div", "la-flat-text", val));
+    container.append(box);
+  }
+  return matched;
+}
+function renderStoryNotes(root, container) {
+  const fields = [
+    ["threads", "THREADS"],
+    ["seeds", "SEEDS"],
+    ["motives", "MOTIVES"],
+    ["horizon", "HORIZON"],
+    ["GremlinNote", "GREMLIN NOTE"],
+    ["heckle", "WORLD TURN"]
+  ];
+  let matched = false;
+  for (const [tag, label] of fields) {
+    const val = childText(root, tag);
+    if (!val || isEmptyVal(val))
+      continue;
+    matched = true;
+    const box = el("div", "la-flat-panel");
+    box.append(el("div", "la-flat-badge", label), el("div", "la-flat-text", val));
+    container.append(box);
+  }
+  return matched;
+}
+function renderNotebook(root, container) {
+  const entries = [...childrenByTag(root, "ent"), ...childrenByTag(root, "note")];
+  if (!entries.length)
+    return false;
+  for (const entry of entries) {
+    const text = normText(entry.textContent);
+    if (!text)
+      continue;
+    const row = el("div", "la-nb-row");
+    row.append(el("span", "la-nb-icon", "✏️"), el("div", "la-flat-text", text));
+    container.append(row);
+  }
+  return true;
+}
+function renderVent(root, container) {
+  const vents = childrenByTag(root, "vent");
+  const texts = vents.length ? vents.map((v) => normText(v.textContent)).filter((t) => !isEmptyVal(t)) : [normText(root.textContent)].filter((t) => !isEmptyVal(t));
+  if (!texts.length) {
+    renderEmpty(container, "vent");
+    return true;
+  }
+  for (const t of texts) {
+    const box = el("div", "la-flat-panel");
+    box.append(el("div", "la-flat-text", t));
+    container.append(box);
+  }
+  return true;
+}
+function renderGeneric(root, container, sectionId, sectionColor, collapsible, expandedCards, onToggle) {
+  const children = Array.from(root.children);
+  if (!children.length) {
+    const text = normText(root.textContent);
+    if (!text || isEmptyVal(text)) {
+      renderEmpty(container, sectionId);
+      return;
+    }
+    const box = el("div", "la-flat-panel");
+    box.append(el("div", "la-flat-text", text));
+    container.append(box);
+    return;
+  }
+  for (let i = 0;i < children.length; i++) {
+    const child = children[i];
+    const subChildren = Array.from(child.children);
+    const nameEl = subChildren.find((c) => ["name", "names", "pair", "title"].includes(c.tagName.toLowerCase()));
+    const badgeEl = subChildren.find((c) => ["standing", "mode", "status", "salience"].includes(c.tagName.toLowerCase()));
+    const title = nameEl ? normText(nameEl.textContent) : child.tagName.replace(/_/g, " ");
+    const badge = badgeEl ? normText(badgeEl.textContent) : undefined;
+    const buildBody = (body) => {
+      if (!subChildren.length) {
+        const t = normText(child.textContent);
+        if (t)
+          body.append(el("div", "la-flat-text", t));
+        return;
+      }
+      for (const sc of subChildren) {
+        if (sc === nameEl)
+          continue;
+        const val = normText(sc.textContent);
+        if (!val)
+          continue;
+        const row = el("div", "la-card-detail");
+        row.append(el("div", "la-card-detail-title", sc.tagName.replace(/_/g, " ").toUpperCase()), el("div", "la-card-detail-text", val));
+        body.append(row);
+      }
+    };
+    if (collapsible) {
+      container.append(makeCollapsibleCard({
+        cardId: `${sectionId}:${title}:${i}`,
+        icon: "•",
+        title,
+        badge,
+        accentColor: sectionColor,
+        expandedCards,
+        onToggle
+      }, buildBody));
+    } else {
+      const box = el("div", "la-flat-panel");
+      if (subChildren.length) {
+        box.append(el("div", "la-flat-badge", title.toUpperCase()));
+        buildBody(box);
+      } else {
+        box.append(el("div", "la-flat-badge", child.tagName.replace(/_/g, " ").toUpperCase()));
+        box.append(el("div", "la-flat-text", normText(child.textContent)));
+      }
+      container.append(box);
+    }
+  }
+}
+function renderStateSection(opts) {
+  const { sectionId, sectionLabel, sectionColor, collapsible, raw, container, expandedCards, onToggle } = opts;
+  const { root, blocked } = parseSectionXml(raw);
+  if (blocked) {
+    renderEmpty(container, sectionLabel);
+    return;
+  }
+  if (!root) {
+    const fallback = normText(raw);
+    if (!fallback || isEmptyVal(fallback)) {
+      renderEmpty(container, sectionLabel);
+      return;
+    }
+    const box = el("div", "la-flat-panel");
+    box.append(el("div", "la-flat-text", fallback));
+    container.append(box);
+    return;
+  }
+  let handled = false;
+  switch (sectionId) {
+    case "world":
+      handled = renderWorld(root, container);
+      break;
+    case "onscreen":
+      handled = renderOnScreen(root, container, expandedCards, onToggle);
+      break;
+    case "offscreen_agendas":
+      handled = renderOffScreen(root, container, expandedCards, onToggle);
+      break;
+    case "locations":
+      handled = renderLocations(root, container, expandedCards, onToggle);
+      break;
+    case "entityMem":
+      handled = renderEntityMemory(root, container, expandedCards, onToggle);
+      break;
+    case "entity_state":
+      handled = renderEntityProfile(root, container, expandedCards, onToggle);
+      break;
+    case "thoughts":
+      handled = renderThoughts(root, container, expandedCards, onToggle);
+      break;
+    case "dam":
+      handled = renderDams(root, container, expandedCards, onToggle);
+      break;
+    case "pair":
+      handled = renderPairs(root, container, expandedCards, onToggle);
+      break;
+    case "tracks":
+      handled = renderTracks(root, container);
+      break;
+    case "arc":
+      handled = renderArc(root, container);
+      break;
+    case "chekhov":
+      handled = renderChekhov(root, container);
+      break;
+    case "leads":
+      handled = renderLeads(root, container);
+      break;
+    case "inv":
+      handled = renderInventory(root, container);
+      break;
+    case "story_notes":
+      handled = renderStoryNotes(root, container);
+      break;
+    case "notebook":
+      handled = renderNotebook(root, container);
+      break;
+    case "vent":
+      handled = renderVent(root, container);
+      break;
+  }
+  if (!handled) {
+    renderGeneric(root, container, sectionId, sectionColor, collapsible, expandedCards, onToggle);
+  }
+}
+
 // src/frontend.ts
 var SVG_NS = "http://www.w3.org/2000/svg";
 var ATLAS_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8Zm4.2-12.2-6.1 2.4-2.3 6 6.1-2.4 2.3-6Zm-4.2 5.4a1.2 1.2 0 1 1 1.2-1.2 1.2 1.2 0 0 1-1.2 1.2Z"/></svg>';
@@ -190,12 +1182,10 @@ var STYLES = `
   height: 100%;
   min-height: 0;
   color: #e8e4df;
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: var(--la-font-size, 12px);
+  font-family: var(--lumiverse-font-family, system-ui, -apple-system, sans-serif);
+  font-size: calc(13px * var(--lumiverse-font-scale, 1));
   line-height: 1.45;
   background: #0f0d0b;
-  /* Scale from Lumiverse theme font size if available */
-  --la-font-size: max(11px, min(16px, var(--lumi-font-size, var(--theme-font-size, 12px))));
 }
 .la-root * { box-sizing: border-box; }
 
@@ -304,7 +1294,7 @@ var STYLES = `
   display: flex; min-height: 0; flex: 1;
 }
 .la-sidebar {
-  width: 110px; flex: none;
+  width: 9.5em; flex: none;
   border-right: 1px solid #2a2520;
   overflow-y: auto;
   padding: 4px 0;
@@ -335,137 +1325,137 @@ var STYLES = `
   padding: 6px;
 }
 
-/* ── Collapsible cards ── */
+/* ── Collapsible cards & native Vexa GFX ── */
 .la-card {
-  margin-bottom: 4px;
-  border: 1px solid #2a2520;
-  border-radius: 6px;
-  background: #1a1612;
+  margin-bottom: 5px;
+  border: 1px solid #2d2620;
+  border-radius: 7px;
+  background: #181411;
   overflow: hidden;
 }
+.la-card-open { border-color: #c4973c; }
 .la-card-head {
-  display: flex; align-items: center; gap: 5px;
-  padding: 4px 8px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 9px;
   cursor: pointer;
   transition: background 80ms;
 }
-.la-card-head:hover { background: rgba(196,151,60,0.04); }
+.la-card-head:hover { background: rgba(196,151,60,0.05); }
 .la-card-head.la-expanded {
-  border-bottom: 1px solid #2a2520;
-  background: rgba(196,151,60,0.06);
+  border-bottom: 1px solid #2d2620;
+  background: rgba(196,151,60,0.08);
 }
-.la-card-chevron {
-  font-size: 0.85em; color: #c4973c;
-  transition: transform 100ms;
-  width: 12px; text-align: center;
-}
-.la-card-head.la-expanded .la-card-chevron { transform: rotate(90deg); }
-.la-card-head.la-flat { cursor: default; }
-.la-card-head.la-flat:hover { background: transparent; }
-.la-card-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
-.la-card-name { font-weight: 700; font-size: 0.92em; color: #e0d8cc; flex: 1; }
+.la-card-chevron { font-size: 0.85em; color: #c4973c; width: 1em; text-align: center; flex: none; }
+.la-card-icon { font-size: 0.95em; flex: none; }
+.la-card-name { font-weight: 700; font-size: 0.94em; color: #ece5da; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.la-loc-id { font-family: var(--lumiverse-font-mono, ui-monospace, monospace); font-size: 0.78em; color: #8a8078; background: #231e19; padding: 1px 4px; border-radius: 3px; }
 .la-card-badge {
-  font-size: 0.75em; font-weight: 600;
-  padding: 0 5px; border-radius: 3px;
-  background: #252018; border: 1px solid #3a332a;
-  color: #b0a090;
+  font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 1px 6px; border-radius: 999px; flex: none;
+  background: #252018; border: 1px solid #4a3d2e; color: #d4b886;
 }
-.la-card-body { padding: 6px 8px; }
+.la-card-body { padding: 7px 9px; display: flex; flex-direction: column; gap: 6px; }
+.la-card-subtext { font-size: 0.9em; color: #b8afa3; white-space: normal; overflow-wrap: anywhere; }
+.la-card-location { font-size: 0.86em; color: #c4b59d; }
 .la-card-detail {
-  margin-top: 4px;
-  padding: 4px 6px;
-  background: rgba(196,151,60,0.03);
-  border-radius: 4px;
-  border: 1px solid #252018;
+  padding: 5px 7px; background: rgba(196,151,60,0.04);
+  border-radius: 5px; border: 1px solid #28221c; border-left: 2px solid #c4973c;
 }
-.la-card-detail-title {
-  font-size: 0.75em; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em;
-  color: #8a8078; margin-bottom: 2px;
+.la-card-detail-title { font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #9c8f80; margin-bottom: 2px; }
+.la-card-detail-text { font-size: 0.92em; color: #dcd4c8; white-space: normal; overflow-wrap: anywhere; }
+.la-card-footer { font-size: 0.8em; color: #8a8078; border-top: 1px solid #26201a; padding-top: 4px; }
+
+/* ── World HUD & Flat panels ── */
+.la-world-hud { display: flex; flex-direction: column; gap: 6px; }
+.la-world-bar { display: flex; flex-wrap: wrap; gap: 4px; }
+.la-world-pill { padding: 2px 7px; border-radius: 5px; background: #1c1713; border: 1px solid #2f2821; font-size: 0.84em; color: #d4ccc0; }
+.la-world-ct { border-color: #c4973c; color: #e8d5a0; font-weight: 700; }
+.la-world-pacing { border-color: #6a8ae8; color: #b8ccf4; font-weight: 600; }
+.la-flat-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+.la-flat-group-title { font-size: 0.78em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #c4973c; padding: 2px 2px 0; }
+.la-flat-panel {
+  padding: 7px 9px; margin-bottom: 5px;
+  border: 1px solid #2d2620; border-radius: 7px; background: #181411;
+  display: flex; flex-direction: column; gap: 4px;
 }
-.la-card-detail-text { font-size: 0.92em; color: #c4bcb0; }
-.la-card-fields { display: grid; gap: 2px; }
-.la-card-field { display: flex; gap: 4px; }
-.la-card-field-label { font-weight: 600; color: #8a8078; min-width: 60px; flex: none; font-size: 0.85em; }
-.la-card-field-value { color: #c4bcb0; font-size: 0.92em; }
-.la-card-location { font-size: 0.85em; color: #8a8078; margin-bottom: 4px; }
+.la-flat-highlight { border-left: 2px solid #c4973c; background: rgba(196,151,60,0.05); }
+.la-flat-badge {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  padding: 1px 7px; border-radius: 999px;
+  background: #231e19; border: 1px solid #3a3128;
+  font-size: 0.76em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #c8bfb2;
+}
+.la-flat-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.la-flat-title { font-weight: 700; font-size: 0.94em; color: #efe8de; }
+.la-flat-meta { font-size: 0.84em; color: #9c9082; }
+.la-flat-text { font-size: 0.92em; color: #ddd5c9; white-space: normal; overflow-wrap: anywhere; line-height: 1.48; }
 
-/* ── Pair metric bars ── */
-.la-pair-bars { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-.la-pair-bar-row { display: flex; align-items: center; gap: 4px; }
-.la-pair-bar-label { font-size: 0.85em; font-weight: 600; min-width: 70px; }
-.la-pair-left { text-align: right; color: #e87a6a; }
-.la-pair-right { text-align: left; color: #6ab4e8; }
-.la-pair-bar { flex: 1; height: 8px; background: #252018; border-radius: 3px; overflow: hidden; position: relative; }
-.la-pair-bar-left { direction: rtl; }
-.la-pair-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #c4973c, #e8b84e); }
-.la-pair-bar-left .la-pair-bar-fill { background: linear-gradient(90deg, #e87a6a, #c45a4a); }
+/* ── Metadata chips, Memory, Profile KV ── */
+.la-meta-bar { display: flex; flex-wrap: wrap; gap: 4px; }
+.la-meta-chip { padding: 1px 6px; border-radius: 999px; background: #221d18; border: 1px solid #352d25; font-size: 0.8em; color: #c4bcb0; }
+.la-meta-mono { font-family: var(--lumiverse-font-mono, ui-monospace, monospace); color: #d4b886; }
+.la-mem-entry { padding: 5px 7px; border-radius: 5px; background: #14110e; border: 1px solid #28221c; display: flex; flex-direction: column; gap: 4px; }
+.la-mem-fact { font-size: 0.92em; color: #ddd5c9; white-space: normal; overflow-wrap: anywhere; }
+.la-mem-cert { border-color: #4a6a50; color: #9ad8a6; }
+.la-kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11em, 1fr)); gap: 5px; }
+.la-kv-cell { padding: 4px 6px; border-radius: 5px; background: #14110e; border: 1px solid #28221c; }
+.la-kv-k { font-size: 0.76em; font-weight: 700; text-transform: uppercase; color: #8a8078; }
+.la-kv-v { font-size: 0.9em; color: #d8d0c4; overflow-wrap: anywhere; }
+.la-color-row { display: flex; align-items: center; gap: 6px; }
+.la-color-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25); flex: none; }
 
-/* ── Dams sections ── */
-.la-dam-section { margin-top: 6px; padding: 4px 6px; background: rgba(196,151,60,0.03); border-radius: 4px; border: 1px solid #252018; }
-.la-dam-section-title { font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8078; margin-bottom: 4px; }
-.la-dam-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 2px 0; }
-.la-dam-toggle-label { font-size: 0.92em; font-weight: 600; color: #c4bcb0; }
-.la-dam-toggle-val { font-size: 0.85em; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
-.la-dam-sealed { background: rgba(196,151,60,0.15); color: #c4973c; border: 1px solid #c4973c; }
-.la-dam-open { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid #4ade80; }
-.la-dam-yes { background: rgba(244,114,182,0.12); color: #f472b6; border: 1px solid #f472b6; }
-.la-dam-no { background: rgba(255,255,255,0.06); color: #a0a0a0; border: 1px solid #555; }
-.la-dam-filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-.la-dam-filter-cell { padding: 4px; background: #1a1612; border-radius: 4px; border: 1px solid #2a2520; }
-.la-dam-filter-name { font-size: 0.85em; font-weight: 700; color: #c4bcb0; margin-bottom: 2px; }
-.la-dam-filter-val { font-size: 0.85em; font-weight: 600; }
-.la-dam-crack { color: #c4973c; }
-.la-dam-hard { color: #e87a6a; }
-.la-dam-intent { margin-top: 6px; padding: 4px 6px; font-size: 0.92em; color: #c4bcb0; background: rgba(196,151,60,0.04); border-radius: 4px; }
-.la-dam-intent-label { font-weight: 700; color: #c4973c; }
+/* ── Notebook rows ── */
+.la-nb-row {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 7px 9px; margin-bottom: 5px;
+  border: 1px solid #2d2620; border-radius: 7px; background: #181411;
+}
+.la-nb-icon { flex: none; font-size: 0.92em; color: #e89b4e; line-height: 1.45; }
+
+/* ── Pair bidirectional metric bars ── */
+.la-axis-stack { display: flex; flex-direction: column; gap: 7px; }
+.la-axis-row { display: flex; flex-direction: column; gap: 3px; }
+.la-axis-labels { display: flex; justify-content: space-between; gap: 6px; font-size: 0.84em; flex-wrap: wrap; }
+.la-axis-side { display: inline-flex; align-items: baseline; gap: 4px; font-weight: 600; }
+.la-axis-neg { color: #e8907e; }
+.la-axis-pos { color: #8ec8f2; }
+.la-axis-acc { font-size: 0.85em; font-weight: 400; color: #8a8078; }
+.la-axis-track { display: flex; align-items: center; height: 8px; background: #241f1a; border-radius: 4px; overflow: hidden; }
+.la-axis-half { flex: 1; height: 100%; display: flex; }
+.la-axis-half-neg { justify-content: flex-end; }
+.la-axis-half-pos { justify-content: flex-start; }
+.la-axis-center { width: 2px; height: 100%; background: #4a4036; flex: none; }
+.la-axis-fill { height: 100%; border-radius: 3px; }
+
+/* ── Dams dashboard (Sluices, Flags, Filters, Intent) ── */
+.la-dam-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(11em, 1fr)); gap: 6px; }
+.la-dam-block { padding: 6px 7px; background: #14110e; border-radius: 6px; border: 1px solid #28221c; display: flex; flex-direction: column; gap: 5px; }
+.la-dam-block-title { font-size: 0.74em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8078; }
+.la-dam-ctrl { display: flex; flex-direction: column; gap: 3px; }
+.la-dam-ctrl-name { font-size: 0.82em; font-weight: 700; color: #cfc6b9; }
+.la-dam-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.la-dam-opts-4 { grid-template-columns: repeat(4, 1fr); }
+.la-dam-opt { text-align: center; font-size: 0.72em; font-weight: 700; padding: 2px 3px; border-radius: 4px; background: #1d1814; border: 1px solid #2d2620; color: #6a6058; }
+.la-opt-amber { background: rgba(196,151,60,0.18); border-color: #c4973c; color: #f0c975; }
+.la-opt-green { background: rgba(74,222,128,0.14); border-color: #4ade80; color: #86efac; }
+.la-opt-red { background: rgba(232,106,106,0.16); border-color: #e86a6a; color: #fca5a5; }
+.la-opt-blue { background: rgba(96,165,250,0.16); border-color: #60a5fa; color: #93c5fd; }
+.la-opt-neutral { background: rgba(255,255,255,0.08); border-color: #7a7068; color: #e8e4df; }
+.la-dam-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11em, 1fr)); gap: 5px; }
+.la-dam-filter-cell { padding: 5px 6px; background: #181411; border-radius: 5px; border: 1px solid #2a241e; display: flex; flex-direction: column; gap: 4px; }
+.la-dam-filter-head { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+.la-dam-counter { font-size: 0.76em; font-weight: 700; color: #d4a84e; }
+.la-dam-intent { padding: 5px 7px; font-size: 0.9em; color: #ddd5c9; background: rgba(196,151,60,0.05); border: 1px solid #2d2620; border-radius: 5px; overflow-wrap: anywhere; }
+.la-dam-intent-label { font-weight: 700; color: #d4a84e; }
 
 /* ── Thoughts Q&A cards ── */
-.la-qa-card { margin-top: 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid #2a2520; }
-.la-qa-odd { background: #1a1612; margin-right: 12px; }
-.la-qa-even { background: #1e1814; margin-left: 12px; }
-.la-qa-badge { display: inline-block; font-size: 0.75em; font-weight: 700; padding: 0 5px; border-radius: 3px; background: rgba(167,139,250,0.15); color: #a78bfa; border: 1px solid #a78bfa; margin-bottom: 3px; }
-.la-qa-question { font-size: 0.92em; font-weight: 700; color: #e8d5a0; margin-bottom: 2px; }
-.la-qa-answer { font-size: 0.92em; color: #c4bcb0; }
-
-/* ── Inventory fields ── */
-.la-inv-field { margin-top: 3px; font-size: 0.92em; }
-.la-inv-field-label { font-weight: 700; color: #c4973c; }
-.la-inv-field-value { color: #c4bcb0; }
-.la-inv-detail { margin-top: 3px; font-size: 0.92em; }
-.la-inv-detail-label { font-weight: 700; color: #c4973c; }
-
-/* ── Notebook entries ── */
-.la-notebook-entry .la-card-body { padding: 4px 8px; }
-
-/* ── Vexa GFX rendered content ── */
-.la-vexa-gfx { min-width: 0; }
-.la-vexa-gfx details { margin-bottom: 4px; }
-.la-vexa-gfx summary { cursor: pointer; }
-.la-vexa-gfx .ist-wrap { font-size: 0.92em; }
-.la-vexa-gfx .ist-wrap .ist-panel { padding: 4px; }
-.la-vexa-gfx .ist-wrap .ist-card { margin-bottom: 3px; }
-.la-vexa-gfx .ist-wrap .ist-badge { font-size: 0.75em; }
-.la-vexa-gfx .ist-wrap .ist-k { font-weight: 600; color: var(--ist-muted, #8a8078); }
-.la-vexa-gfx .ist-wrap .ist-v { color: var(--ist-text, #c4bcb0); }
-
-/* ── Location cards (Rendered style) ── */
-.la-location-card {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 8px; margin-bottom: 3px;
-  border: 1px solid #2a2520; border-radius: 6px;
-  background: #1a1612;
-  border-left: 2px solid #c4973c;
-}
-.la-location-icon { font-size: 1em; }
-.la-location-name { font-weight: 700; font-size: 0.92em; color: #e0d8cc; flex: 1; }
-.la-location-id { font-family: monospace; font-size: 0.75em; color: #6a6058; }
-.la-location-badge {
-  font-size: 0.75em; font-weight: 600;
-  padding: 0 5px; border-radius: 3px;
-  background: rgba(196,151,60,0.1); border: 1px solid #c4973c;
-  color: #d4b44e;
-}
+.la-qa-card { padding: 6px 8px; border-radius: 6px; border: 1px solid #2d2620; display: flex; flex-direction: column; gap: 3px; }
+.la-qa-odd { background: #14110e; margin-right: 10px; }
+.la-qa-even { background: #1d1713; margin-left: 10px; }
+.la-qa-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.la-qa-badge { display: inline-block; font-size: 0.74em; font-weight: 700; padding: 0 5px; border-radius: 999px; background: rgba(167,139,250,0.16); color: #c4b5fd; border: 1px solid #a78bfa; flex: none; }
+.la-qa-question { font-size: 0.9em; font-weight: 700; color: #eed89c; }
+.la-qa-answer { font-size: 0.92em; color: #e2dad0; white-space: normal; overflow-wrap: anywhere; }
 
 /* ── Map section ── */
 .la-map-controls { display: flex; gap: 4px; padding: 5px 8px; flex-wrap: wrap; align-items: center; }
@@ -561,7 +1551,6 @@ function readInternalSnapshot(raw) {
   }
   return { sections, ledger: typeof value.ledger === "string" ? value.ledger : undefined };
 }
-var LEDGER_ELEMENT = /^(?:(?:[\w.-]+:)?(?:details|ledger|activation)|ledger:[\w.-]+)$/i;
 function formatStateText(raw, omitLedger = false) {
   const input = raw.trim();
   if (!input || /<!\s*(?:DOCTYPE|ENTITY)/i.test(input))
@@ -633,430 +1622,7 @@ function revealedLedger(raw) {
     return null;
   }
 }
-var cachedRegexScripts = null;
-var regexFetchPromise = null;
-async function fetchDisplayRegexes(ctx) {
-  if (cachedRegexScripts)
-    return cachedRegexScripts;
-  if (regexFetchPromise)
-    return regexFetchPromise;
-  regexFetchPromise = (async () => {
-    try {
-      const reqId = `la_regex_${Date.now()}`;
-      return await new Promise((resolve) => {
-        const handler = (raw) => {
-          const msg = raw;
-          if (msg.type === "regex_scripts" && msg.requestId === reqId) {
-            resolve(msg.scripts ?? []);
-            cachedRegexScripts = msg.scripts ?? [];
-          }
-        };
-        const unsub = ctx.onBackendMessage(handler);
-        ctx.sendToBackend({ type: "get_regex_scripts", requestId: reqId });
-        setTimeout(() => {
-          unsub();
-          resolve([]);
-        }, 2000);
-      });
-    } catch {
-      return [];
-    } finally {
-      regexFetchPromise = null;
-    }
-  })();
-  return regexFetchPromise;
-}
-function applyRegexScripts(input, scripts) {
-  let result = input;
-  const sorted = [...scripts].sort((a, b) => a.sortOrder - b.sortOrder);
-  for (const script of sorted) {
-    try {
-      const re = new RegExp(script.findRegex, script.flags);
-      result = result.replace(re, script.replaceString);
-    } catch {}
-  }
-  return result;
-}
-var refreshStateContent = () => {};
-function renderFlatList(raw, container, sectionColor) {
-  const records = parseStateRecords(raw);
-  for (const record of records) {
-    const card = el("div", "la-card");
-    const head = el("div", "la-card-head la-flat");
-    const dot = el("span", "la-card-dot");
-    dot.style.background = sectionColor;
-    const name = el("span", "la-card-name", record.name);
-    head.append(dot, name);
-    if (record.badge)
-      head.append(el("span", "la-card-badge", record.badge));
-    card.append(head);
-    const body = el("div", "la-card-body");
-    if (record.location)
-      body.append(el("div", "la-card-location", `→ ${record.location}`));
-    if (record.fields.length) {
-      const fields = el("div", "la-card-fields");
-      for (const field of record.fields) {
-        const fieldEl = el("div", "la-card-field");
-        fieldEl.append(el("span", "la-card-field-label", field.label));
-        fieldEl.append(el("span", "la-card-field-value", field.value));
-        fields.append(fieldEl);
-      }
-      body.append(fields);
-    }
-    if (record.details.length) {
-      for (const detail of record.details) {
-        const detailEl = el("div", "la-card-detail");
-        detailEl.append(el("div", "la-card-detail-title", detail.title));
-        detailEl.append(el("div", "la-card-detail-text", detail.text));
-        body.append(detailEl);
-      }
-    }
-    if (record.rawText && !record.fields.length && !record.details.length) {
-      body.append(el("div", "la-card-detail-text", record.rawText));
-    }
-    card.append(body);
-    container.append(card);
-  }
-}
-function renderCollapsibleCards(raw, container, sectionColor, expandedCards, sectionId) {
-  const records = parseStateRecords(raw);
-  for (const record of records) {
-    const cardId = `${sectionId}:${record.name}`;
-    const isExpanded = expandedCards.has(cardId);
-    const card = el("div", "la-card");
-    const head = el("div", `la-card-head${isExpanded ? " la-expanded" : ""}`);
-    const chevron = el("span", "la-card-chevron", isExpanded ? "▾" : "▸");
-    const dot = el("span", "la-card-dot");
-    dot.style.background = sectionColor;
-    const name = el("span", "la-card-name", record.name);
-    head.append(chevron, dot, name);
-    if (record.badge)
-      head.append(el("span", "la-card-badge", record.badge));
-    card.append(head);
-    if (isExpanded) {
-      const body = el("div", "la-card-body");
-      if (record.location)
-        body.append(el("div", "la-card-location", `→ ${record.location}`));
-      if (record.fields.length) {
-        const fields = el("div", "la-card-fields");
-        for (const field of record.fields) {
-          const fieldEl = el("div", "la-card-field");
-          fieldEl.append(el("span", "la-card-field-label", field.label));
-          fieldEl.append(el("span", "la-card-field-value", field.value));
-          fields.append(fieldEl);
-        }
-        body.append(fields);
-      }
-      if (record.details.length) {
-        for (const detail of record.details) {
-          const detailEl = el("div", "la-card-detail");
-          detailEl.append(el("div", "la-card-detail-title", detail.title));
-          detailEl.append(el("div", "la-card-detail-text", detail.text));
-          body.append(detailEl);
-        }
-      }
-      if (record.rawText && !record.fields.length && !record.details.length) {
-        body.append(el("div", "la-card-detail-text", record.rawText));
-      }
-      card.append(body);
-    }
-    head.addEventListener("click", () => {
-      if (expandedCards.has(cardId))
-        expandedCards.delete(cardId);
-      else
-        expandedCards.add(cardId);
-      refreshStateContent();
-    });
-    container.append(card);
-  }
-}
-function renderPairMetrics(raw, container) {
-  const records = parseStateRecords(raw);
-  for (const record of records) {
-    const card = el("div", "la-card");
-    const head = el("div", "la-card-head");
-    const chevron = el("span", "la-card-chevron", "▾");
-    const icon = el("span", undefined, "\uD83D\uDC9A");
-    const name = el("span", "la-card-name", record.name);
-    const badge = el("span", "la-card-badge", record.badge || "PAIR");
-    head.append(chevron, icon, name, badge);
-    card.append(head);
-    const body = el("div", "la-card-body");
-    const pairFields = [];
-    for (const field of record.fields) {
-      const match = field.value.match(/^(.+?)\s*(\d+)\s*acc\s*(\d+)$/i);
-      if (match) {
-        pairFields.push({ left: field.label, leftVal: match[2], right: field.label, rightVal: match[2] });
-      } else {
-        const fieldEl = el("div", "la-card-field");
-        fieldEl.append(el("span", "la-card-field-label", field.label));
-        fieldEl.append(el("span", "la-card-field-value", field.value));
-        body.append(fieldEl);
-      }
-    }
-    if (pairFields.length) {
-      const bars = el("div", "la-pair-bars");
-      for (const pf of pairFields) {
-        const barRow = el("div", "la-pair-bar-row");
-        const leftLabel = el("span", "la-pair-bar-label la-pair-left", pf.left);
-        const leftBar = el("div", "la-pair-bar la-pair-bar-left");
-        const leftFill = el("div", "la-pair-bar-fill");
-        leftFill.style.width = `${Math.min(100, parseInt(pf.leftVal) * 8)}%`;
-        leftBar.append(leftFill);
-        const rightBar = el("div", "la-pair-bar la-pair-bar-right");
-        const rightFill = el("div", "la-pair-bar-fill");
-        rightFill.style.width = `${Math.min(100, parseInt(pf.rightVal) * 8)}%`;
-        rightBar.append(rightFill);
-        const rightLabel = el("span", "la-pair-bar-label la-pair-right", pf.right);
-        barRow.append(leftLabel, leftBar, rightBar, rightLabel);
-        bars.append(barRow);
-      }
-      body.append(bars);
-    }
-    for (const detail of record.details) {
-      const detailEl = el("div", "la-card-detail");
-      detailEl.append(el("div", "la-card-detail-title", detail.title));
-      detailEl.append(el("div", "la-card-detail-text", detail.text));
-      body.append(detailEl);
-    }
-    card.append(body);
-    container.append(card);
-  }
-}
-function renderDams(raw, container) {
-  const records = parseStateRecords(raw);
-  for (const record of records) {
-    const card = el("div", "la-card");
-    const head = el("div", "la-card-head");
-    const chevron = el("span", "la-card-chevron", "▾");
-    const icon = el("span", undefined, "\uD83E\uDEB5");
-    const name = el("span", "la-card-name", record.name);
-    const badge = el("span", "la-card-badge", record.badge || "DIRECTIONAL");
-    head.append(chevron, icon, name, badge);
-    card.append(head);
-    const body = el("div", "la-card-body");
-    const sluices = [];
-    const flags = [];
-    const filters = [];
-    let intent = "";
-    for (const field of record.fields) {
-      const l = field.label.toUpperCase();
-      if (l.includes("SLUICE") || l === "E" || l === "L" || l === "EMOTION" || l === "LANGUAGE") {
-        sluices.push(field);
-      } else if (l.includes("FLAG") || l === "CLASH" || l === "TENSION") {
-        flags.push(field);
-      } else if (l.includes("FILTER") || l === "SOCIAL" || l === "VALUES" || l === "COMPETENCE" || l === "RELATIONSHIP") {
-        filters.push(field);
-      } else if (l.includes("INTENT")) {
-        intent = field.value;
-      } else {
-        const fieldEl = el("div", "la-card-field");
-        fieldEl.append(el("span", "la-card-field-label", field.label));
-        fieldEl.append(el("span", "la-card-field-value", field.value));
-        body.append(fieldEl);
-      }
-    }
-    if (sluices.length) {
-      const sluiceBox = el("div", "la-dam-section");
-      sluiceBox.append(el("div", "la-dam-section-title", "SLUICES"));
-      for (const s of sluices) {
-        const row = el("div", "la-dam-toggle-row");
-        row.append(el("span", "la-dam-toggle-label", s.label));
-        const val = el("span", `la-dam-toggle-val ${s.value.toLowerCase().includes("open") ? "la-dam-open" : "la-dam-sealed"}`, s.value);
-        row.append(val);
-        sluiceBox.append(row);
-      }
-      body.append(sluiceBox);
-    }
-    if (flags.length) {
-      const flagBox = el("div", "la-dam-section");
-      flagBox.append(el("div", "la-dam-section-title", "FLAGS"));
-      for (const f of flags) {
-        const row = el("div", "la-dam-toggle-row");
-        row.append(el("span", "la-dam-toggle-label", f.label));
-        const val = el("span", `la-dam-toggle-val ${f.value.toLowerCase().includes("yes") ? "la-dam-yes" : "la-dam-no"}`, f.value);
-        row.append(val);
-        flagBox.append(row);
-      }
-      body.append(flagBox);
-    }
-    if (filters.length) {
-      const filterBox = el("div", "la-dam-section");
-      filterBox.append(el("div", "la-dam-section-title", "FILTERS"));
-      const grid = el("div", "la-dam-filter-grid");
-      for (const f of filters) {
-        const cell = el("div", "la-dam-filter-cell");
-        cell.append(el("div", "la-dam-filter-name", f.label));
-        cell.append(el("div", `la-dam-filter-val ${f.value.toLowerCase().includes("crack") ? "la-dam-crack" : f.value.toLowerCase().includes("hard") ? "la-dam-hard" : "la-dam-open"}`, f.value));
-        grid.append(cell);
-      }
-      filterBox.append(grid);
-      body.append(filterBox);
-    }
-    if (intent) {
-      const intentEl = el("div", "la-dam-intent");
-      intentEl.append(el("span", undefined, "\uD83C\uDFAF "), el("span", "la-dam-intent-label", "INTENT: "), el("span", undefined, intent));
-      body.append(intentEl);
-    }
-    for (const detail of record.details) {
-      const detailEl = el("div", "la-card-detail");
-      detailEl.append(el("div", "la-card-detail-title", detail.title));
-      detailEl.append(el("div", "la-card-detail-text", detail.text));
-      body.append(detailEl);
-    }
-    card.append(body);
-    container.append(card);
-  }
-}
-function renderThoughts(raw, container) {
-  const records = parseStateRecords(raw);
-  for (const record of records) {
-    const card = el("div", "la-card");
-    const head = el("div", "la-card-head");
-    const chevron = el("span", "la-card-chevron", "▾");
-    const icon = el("span", undefined, "\uD83D\uDCAD");
-    const name = el("span", "la-card-name", record.name);
-    const badge = el("span", "la-card-badge", record.badge || "BTS INTERVIEW");
-    head.append(chevron, icon, name, badge);
-    card.append(head);
-    const body = el("div", "la-card-body");
-    let qNum = 0;
-    for (const detail of record.details) {
-      qNum++;
-      const qa = el("div", `la-qa-card ${qNum % 2 === 0 ? "la-qa-even" : "la-qa-odd"}`);
-      const qBadge = el("span", "la-qa-badge", `Q${qNum}`);
-      const qText = el("div", "la-qa-question", detail.title);
-      const aText = el("div", "la-qa-answer", detail.text);
-      qa.append(qBadge, qText, aText);
-      body.append(qa);
-    }
-    if (record.rawText && !record.details.length) {
-      body.append(el("div", "la-card-detail-text", record.rawText));
-    }
-    card.append(body);
-    container.append(card);
-  }
-}
-function renderInventory(raw, container) {
-  const records = parseStateRecords(raw);
-  for (const record of records) {
-    const card = el("div", "la-card");
-    const head = el("div", "la-card-head la-flat");
-    const dot = el("span", "la-card-dot");
-    dot.style.background = "#a3a3a3";
-    const name = el("span", "la-card-name", record.name);
-    head.append(dot, name);
-    card.append(head);
-    const body = el("div", "la-card-body");
-    for (const field of record.fields) {
-      const fieldEl = el("div", "la-inv-field");
-      fieldEl.append(el("span", "la-inv-field-label", `${field.label}: `));
-      fieldEl.append(el("span", "la-inv-field-value", field.value));
-      body.append(fieldEl);
-    }
-    for (const detail of record.details) {
-      const detailEl = el("div", "la-inv-detail");
-      detailEl.append(el("span", "la-inv-detail-label", `${detail.title}: `));
-      detailEl.append(el("span", undefined, detail.text));
-      body.append(detailEl);
-    }
-    if (record.rawText && !record.fields.length && !record.details.length) {
-      body.append(el("div", "la-card-detail-text", record.rawText));
-    }
-    card.append(body);
-    container.append(card);
-  }
-}
-function renderNotebook(raw, container) {
-  const records = parseStateRecords(raw);
-  for (const record of records) {
-    const card = el("div", "la-card la-notebook-entry");
-    const head = el("div", "la-card-head la-flat");
-    const dot = el("span", "la-card-dot");
-    dot.style.background = "#a3a3a3";
-    const name = el("span", "la-card-name", record.name);
-    head.append(dot, name);
-    if (record.badge)
-      head.append(el("span", "la-card-badge", record.badge));
-    card.append(head);
-    const body = el("div", "la-card-body");
-    if (record.rawText) {
-      body.append(el("div", "la-card-detail-text", record.rawText));
-    }
-    for (const field of record.fields) {
-      body.append(el("div", "la-card-detail-text", `${field.label}: ${field.value}`));
-    }
-    for (const detail of record.details) {
-      body.append(el("div", "la-card-detail-text", `${detail.title}: ${detail.text}`));
-    }
-    card.append(body);
-    container.append(card);
-  }
-}
-function parseStateRecords(raw) {
-  const input = raw.trim();
-  if (!input)
-    return [];
-  try {
-    const parser = new window.DOMParser;
-    const parsed = parser.parseFromString(`<root xmlns:state="urn:lumi-atlas:state">${input}</root>`, "application/xml");
-    if (parsed.querySelector("parsererror"))
-      return [{ name: "Raw", fields: [], details: [], rawText: input }];
-    const records = [];
-    const root = parsed.documentElement;
-    const stateEl = Array.from(root.children).find((el) => el.tagName.startsWith("state:") && !LEDGER_ELEMENT.test(el.tagName));
-    if (!stateEl) {
-      const anyState = Array.from(root.children).find((el) => el.tagName.startsWith("state:"));
-      if (anyState && LEDGER_ELEMENT.test(anyState.tagName))
-        return [];
-      return [{ name: "Raw", fields: [], details: [], rawText: input }];
-    }
-    const children = Array.from(stateEl.children).filter((el) => !LEDGER_ELEMENT.test(el.tagName));
-    if (!children.length) {
-      const clone = stateEl.cloneNode(true);
-      for (const el of Array.from(clone.querySelectorAll("*"))) {
-        if (LEDGER_ELEMENT.test(el.tagName))
-          el.remove();
-      }
-      const text = clone.textContent?.trim();
-      return text ? [{ name: stateEl.tagName.replace(/^state:/, ""), fields: [], details: [], rawText: text }] : [];
-    }
-    for (const record of children) {
-      const fields = [];
-      const details = [];
-      let name = record.tagName.replace(/_/g, " ");
-      let badge;
-      let location;
-      for (const child of Array.from(record.children)) {
-        if (LEDGER_ELEMENT.test(child.tagName))
-          continue;
-        const label = child.tagName.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2");
-        const value = child.textContent?.trim() ?? "";
-        if (!value)
-          continue;
-        if (child.tagName === "name" || child.tagName === "names" || child.tagName === "pair") {
-          name = value;
-        } else if (child.tagName === "loc" || child.tagName === "location") {
-          location = value;
-        } else if (["mode", "standing", "status", "salience", "sig"].includes(child.tagName)) {
-          badge = child.tagName === "sig" ? `SIG ${value}` : value;
-        } else if (["agenda", "why", "goal", "end", "move", "parrott", "residualMood", "tfdy"].includes(child.tagName)) {
-          details.push({ title: child.tagName.toUpperCase(), text: value });
-        } else {
-          fields.push({ label, value });
-        }
-      }
-      if (name === record.tagName.replace(/_/g, " ") && !record.children.length) {
-        name = record.textContent?.trim() ?? name;
-      }
-      records.push({ name, badge, location, fields, details, rawText: "" });
-    }
-    return records.length ? records : [{ name: "Data", fields: [], details: [], rawText: formatStateText(input) }];
-  } catch {
-    return [{ name: "Raw", fields: [], details: [], rawText: input }];
-  }
-}
-function el(tag, className, text) {
+function el2(tag, className, text) {
   const node = document.createElement(tag);
   if (className)
     node.className = className;
@@ -1199,133 +1765,133 @@ function setup(ctx) {
     cameraScaleKey: "",
     destroyed: false
   };
-  const root = el("div", "la-root");
-  const header = el("div", "la-header");
-  const titleGroup = el("div", "la-title-group");
-  const locationEl = el("div", "la-location", "LumiAtlas");
-  const subtitleEl = el("div", "la-subtitle", "Loading…");
+  const root = el2("div", "la-root");
+  const header = el2("div", "la-header");
+  const titleGroup = el2("div", "la-title-group");
+  const locationEl = el2("div", "la-location", "LumiAtlas");
+  const subtitleEl = el2("div", "la-subtitle", "Loading…");
   titleGroup.append(locationEl, subtitleEl);
-  const actions = el("div", "la-actions");
-  const analyzeBtn = el("button", "la-btn la-btn-primary", "Analyze");
-  const rebuildBtn = el("button", "la-btn", "Rebuild");
-  const cancelBtn = el("button", "la-btn la-btn-danger", "Cancel");
+  const actions = el2("div", "la-actions");
+  const analyzeBtn = el2("button", "la-btn la-btn-primary", "Analyze");
+  const rebuildBtn = el2("button", "la-btn", "Rebuild");
+  const cancelBtn = el2("button", "la-btn la-btn-danger", "Cancel");
   cancelBtn.hidden = true;
-  const settingsBtn = el("button", "la-btn", "Settings");
+  const settingsBtn = el2("button", "la-btn", "Settings");
   actions.append(analyzeBtn, rebuildBtn, cancelBtn, settingsBtn);
   header.append(titleGroup, actions);
-  const settingsBox = el("div", "la-settings");
+  const settingsBox = el2("div", "la-settings");
   settingsBox.hidden = true;
-  const connField = el("label", "la-field", "Background Model");
-  const connSelect = el("select", "la-select");
+  const connField = el2("label", "la-field", "Background Model");
+  const connSelect = el2("select", "la-select");
   connField.append(connSelect);
-  const toggles = el("div", "la-toggles");
-  const enabledLabel = el("label", "la-check");
-  const enabledInput = el("input");
+  const toggles = el2("div", "la-toggles");
+  const enabledLabel = el2("label", "la-check");
+  const enabledInput = el2("input");
   enabledInput.type = "checkbox";
   enabledLabel.append(enabledInput, document.createTextNode("Enable"));
-  const autoLabel = el("label", "la-check");
-  const autoInput = el("input");
+  const autoLabel = el2("label", "la-check");
+  const autoInput = el2("input");
   autoInput.type = "checkbox";
   autoLabel.append(autoInput, document.createTextNode("Auto-update"));
-  const reasoningLabel = el("label", "la-check");
-  const reasoningInput = el("input");
+  const reasoningLabel = el2("label", "la-check");
+  const reasoningInput = el2("input");
   reasoningInput.type = "checkbox";
   reasoningLabel.append(reasoningInput, document.createTextNode("Thinking"));
-  const refreshBtn = el("button", "la-btn", "Reload");
+  const refreshBtn = el2("button", "la-btn", "Reload");
   toggles.append(enabledLabel, autoLabel, reasoningLabel, refreshBtn);
   settingsBox.append(connField, toggles);
-  const errorBanner = el("div", "la-banner la-banner-error");
+  const errorBanner = el2("div", "la-banner la-banner-error");
   errorBanner.hidden = true;
-  const staleBanner = el("div", "la-banner la-banner-stale");
+  const staleBanner = el2("div", "la-banner la-banner-stale");
   staleBanner.hidden = true;
-  const thinkingBox = el("div", "la-thinking");
+  const thinkingBox = el2("div", "la-thinking");
   thinkingBox.hidden = true;
-  const thinkingHead = el("div", "la-thinking-head");
-  const thinkingTitle = el("div", "la-thinking-title");
-  const thinkingDot = el("span", "la-thinking-dot la-pulse");
-  const thinkingLabel = el("span", undefined, "Model thinking…");
+  const thinkingHead = el2("div", "la-thinking-head");
+  const thinkingTitle = el2("div", "la-thinking-title");
+  const thinkingDot = el2("span", "la-thinking-dot la-pulse");
+  const thinkingLabel = el2("span", undefined, "Model thinking…");
   thinkingTitle.append(thinkingDot, thinkingLabel);
-  const thinkingMeta = el("span", "la-thinking-meta", "");
+  const thinkingMeta = el2("span", "la-thinking-meta", "");
   thinkingHead.append(thinkingTitle, thinkingMeta);
-  const thinkingBody = el("pre", "la-thinking-body", "");
+  const thinkingBody = el2("pre", "la-thinking-body", "");
   thinkingBox.append(thinkingHead, thinkingBody);
-  const browser = el("div", "la-browser");
-  const mapSection = el("div", "la-section la-map-section");
-  const mapHead = el("div", "la-section-head");
-  const mapTitle = el("div", "la-section-title");
-  mapTitle.append(el("span", "la-section-icon", "\uD83D\uDDFA"), el("span", undefined, "Map"));
+  const browser = el2("div", "la-browser");
+  const mapSection = el2("div", "la-section la-map-section");
+  const mapHead = el2("div", "la-section-head");
+  const mapTitle = el2("div", "la-section-title");
+  mapTitle.append(el2("span", "la-section-icon", "\uD83D\uDDFA"), el2("span", undefined, "Map"));
   mapHead.append(mapTitle);
-  const mapControls = el("div", "la-map-controls");
-  const scaleField = el("label", "la-field", "Scale");
-  const scaleSelect = el("select", "la-select");
+  const mapControls = el2("div", "la-map-controls");
+  const scaleField = el2("label", "la-field", "Scale");
+  const scaleSelect = el2("select", "la-select");
   scaleSelect.setAttribute("aria-label", "Map scale");
   for (const [value, label] of [["local", "Local"], ["region", "Region"], ["world", "World"]]) {
-    const opt = el("option", undefined, label);
+    const opt = el2("option", undefined, label);
     opt.value = value;
     scaleSelect.append(opt);
   }
   scaleField.append(scaleSelect);
-  const zoneField = el("label", "la-field", "Zone");
-  const zoneSelect = el("select", "la-select");
+  const zoneField = el2("label", "la-field", "Zone");
+  const zoneSelect = el2("select", "la-select");
   zoneSelect.setAttribute("aria-label", "Zone map");
   zoneField.append(zoneSelect);
   mapControls.append(scaleField, zoneField);
-  const canvasWrap = el("div", "la-canvas-wrap");
+  const canvasWrap = el2("div", "la-canvas-wrap");
   const svg = svgEl("svg", { class: "la-svg", viewBox: "-50 -50 100 100", preserveAspectRatio: "xMidYMid meet" });
-  const hudBadge = el("div", "la-hud-badge", "Local");
-  const hudCorner = el("div", "la-hud-corner");
-  const zoomInBtn = el("button", "la-btn la-btn-icon", "+");
+  const hudBadge = el2("div", "la-hud-badge", "Local");
+  const hudCorner = el2("div", "la-hud-corner");
+  const zoomInBtn = el2("button", "la-btn la-btn-icon", "+");
   zoomInBtn.title = "Zoom in";
-  const zoomOutBtn = el("button", "la-btn la-btn-icon", "−");
+  const zoomOutBtn = el2("button", "la-btn la-btn-icon", "−");
   zoomOutBtn.title = "Zoom out";
-  const fitBtn = el("button", "la-btn la-btn-icon", "Fit");
+  const fitBtn = el2("button", "la-btn la-btn-icon", "Fit");
   fitBtn.title = "Fit map";
   hudCorner.append(zoomOutBtn, zoomInBtn, fitBtn);
-  const emptyOverlay = el("div", "la-empty-overlay");
+  const emptyOverlay = el2("div", "la-empty-overlay");
   canvasWrap.append(svg, hudBadge, hudCorner, emptyOverlay);
-  const mapToolbar = el("div", "la-map-toolbar");
-  const floorBar = el("div", "la-floors");
-  const pinsToggle = el("button", "la-btn la-btn-active", "Pins");
-  const roadsToggle = el("button", "la-btn la-btn-active", "Roads");
-  const labelsToggle = el("button", "la-btn la-btn-active", "Labels");
+  const mapToolbar = el2("div", "la-map-toolbar");
+  const floorBar = el2("div", "la-floors");
+  const pinsToggle = el2("button", "la-btn la-btn-active", "Pins");
+  const roadsToggle = el2("button", "la-btn la-btn-active", "Roads");
+  const labelsToggle = el2("button", "la-btn la-btn-active", "Labels");
   mapToolbar.append(floorBar, pinsToggle, roadsToggle, labelsToggle);
-  const inspector = el("div", "la-inspector");
-  const mapBody = el("div", "la-section-body");
+  const inspector = el2("div", "la-inspector");
+  const mapBody = el2("div", "la-section-body");
   mapBody.append(mapControls, canvasWrap, mapToolbar, inspector);
   mapSection.append(mapHead, mapBody);
-  const statesSection = el("div", "la-section");
-  const statesHead = el("div", "la-section-head");
-  const statesTitle = el("div", "la-section-title");
-  statesTitle.append(el("span", "la-section-icon", "\uD83D\uDCCA"), el("span", undefined, "Internal States"));
+  const statesSection = el2("div", "la-section");
+  const statesHead = el2("div", "la-section-head");
+  const statesTitle = el2("div", "la-section-title");
+  statesTitle.append(el2("span", "la-section-icon", "\uD83D\uDCCA"), el2("span", undefined, "Internal States"));
   statesHead.append(statesTitle);
-  const statusBar = el("div", "la-status-bar");
-  const stateLayout = el("div", "la-state-layout");
-  const sidebar = el("div", "la-sidebar");
-  const stateContent = el("div", "la-state-content");
+  const statusBar = el2("div", "la-status-bar");
+  const stateLayout = el2("div", "la-state-layout");
+  const sidebar = el2("div", "la-sidebar");
+  const stateContent = el2("div", "la-state-content");
   for (const category of CATEGORIES) {
     const sections = STATE_SECTIONS.filter((s) => s.category === category);
     if (!sections.length)
       continue;
-    sidebar.append(el("div", "la-sidebar-category", category));
+    sidebar.append(el2("div", "la-sidebar-category", category));
     for (const section of sections) {
-      const item = el("div", "la-sidebar-item");
+      const item = el2("div", "la-sidebar-item");
       item.setAttribute("data-section", section.id);
-      const icon = el("span", "la-sidebar-icon", section.icon);
+      const icon = el2("span", "la-sidebar-icon", section.icon);
       icon.style.color = section.color;
-      item.append(icon, el("span", undefined, section.label));
+      item.append(icon, el2("span", undefined, section.label));
       sidebar.append(item);
     }
   }
   stateLayout.append(sidebar, stateContent);
-  const statesBody = el("div", "la-section-body");
+  const statesBody = el2("div", "la-section-body");
   statesBody.append(statusBar, stateLayout);
   statesSection.append(statesHead, statesBody);
-  const ledgerSection = el("div", "la-section");
-  const ledgerHead = el("div", "la-section-head");
-  const ledgerTitle = el("div", "la-section-title");
-  ledgerTitle.append(el("span", "la-section-icon", "\uD83D\uDCD2"), el("span", undefined, "Ledger"));
+  const ledgerSection = el2("div", "la-section");
+  const ledgerHead = el2("div", "la-section-head");
+  const ledgerTitle = el2("div", "la-section-title");
+  ledgerTitle.append(el2("span", "la-section-icon", "\uD83D\uDCD2"), el2("span", undefined, "Ledger"));
   ledgerHead.append(ledgerTitle);
-  const ledgerBody = el("div", "la-section-body la-ledger-body");
+  const ledgerBody = el2("div", "la-section-body la-ledger-body");
   ledgerSection.append(ledgerHead, ledgerBody);
   browser.append(mapSection, statesSection, ledgerSection);
   root.append(header, settingsBox, errorBanner, staleBanner, thinkingBox, browser);
@@ -1403,13 +1969,13 @@ function setup(ctx) {
     if (!state.activeChatId) {
       hudBadge.textContent = "No Chat";
       emptyOverlay.hidden = false;
-      emptyOverlay.replaceChildren(el("strong", undefined, "Open a roleplay chat"), el("span", undefined, "LumiAtlas tracks states per chat."));
+      emptyOverlay.replaceChildren(el2("strong", undefined, "Open a roleplay chat"), el2("span", undefined, "LumiAtlas tracks states per chat."));
       return;
     }
     hudBadge.textContent = layer && layer.tiles.length > 0 ? `${layer.name}${state.scale === "local" ? ` · F${state.floor}` : ""} (${tiles.length})` : state.scale.toUpperCase();
     if (!layer || tiles.length === 0) {
       emptyOverlay.hidden = false;
-      emptyOverlay.replaceChildren(el("strong", undefined, `No ${state.scale} tiles yet`), el("span", undefined, state.config.connectionId ? "Click Analyze to generate." : "Pick a model in Settings, then Analyze."));
+      emptyOverlay.replaceChildren(el2("strong", undefined, `No ${state.scale} tiles yet`), el2("span", undefined, state.config.connectionId ? "Click Analyze to generate." : "Pick a model in Settings, then Analyze."));
       return;
     }
     emptyOverlay.hidden = true;
@@ -1571,38 +2137,38 @@ ${tile.summary}` : ""}`;
     inspector.replaceChildren();
     const layer = currentLayer();
     if (!layer || !layer.tiles.length) {
-      inspector.append(el("div", "la-subtitle", "Select a tile to inspect."));
+      inspector.append(el2("div", "la-subtitle", "Select a tile to inspect."));
       return;
     }
     const visible = getVisibleTiles(layer, state.floor);
     const tile = visible.find((t) => t.id === state.selectedTileId) ?? visible.find((t) => t.id === layer.currentTileId) ?? visible[0];
     if (!tile)
       return;
-    const head = el("div", "la-insp-head");
-    head.append(el("div", "la-insp-title", tile.name));
-    const pills = el("div", "la-pill-row");
+    const head = el2("div", "la-insp-head");
+    head.append(el2("div", "la-insp-title", tile.name));
+    const pills = el2("div", "la-pill-row");
     const statusClass = tile.status === "current" || layer.currentTileId === tile.id ? "la-pill la-pill-current" : tile.status === "locked" || tile.status === "unexplored" ? "la-pill la-pill-locked" : "la-pill";
-    pills.append(el("span", statusClass, layer.currentTileId === tile.id ? "here" : tile.status));
-    pills.append(el("span", "la-pill", tile.kind));
+    pills.append(el2("span", statusClass, layer.currentTileId === tile.id ? "here" : tile.status));
+    pills.append(el2("span", "la-pill", tile.kind));
     if (tile.sizeLabel)
-      pills.append(el("span", "la-pill", tile.sizeLabel));
+      pills.append(el2("span", "la-pill", tile.sizeLabel));
     head.append(pills);
     inspector.append(head);
     if (tile.summary)
-      inspector.append(el("p", "la-insp-summary", tile.summary));
+      inspector.append(el2("p", "la-insp-summary", tile.summary));
     if (tile.features.length > 0 && tile.status !== "locked" && tile.status !== "unexplored") {
-      inspector.append(el("div", "la-insp-section-label", "Features & Hooks"));
-      const ul = el("ul", "la-feature-list");
+      inspector.append(el2("div", "la-insp-section-label", "Features & Hooks"));
+      const ul = el2("ul", "la-feature-list");
       for (const feat of tile.features)
-        ul.append(el("li", undefined, feat));
+        ul.append(el2("li", undefined, feat));
       inspector.append(ul);
     }
     if (tile.pins.length > 0) {
-      inspector.append(el("div", "la-insp-section-label", "Characters Here"));
-      const row = el("div", "la-chip-row");
+      inspector.append(el2("div", "la-insp-section-label", "Characters Here"));
+      const row = el2("div", "la-chip-row");
       for (const pin of tile.pins) {
-        const chip = el("span", "la-pin-chip");
-        const dot = el("span", "la-pin-dot");
+        const chip = el2("span", "la-pin-chip");
+        const dot = el2("span", "la-pin-dot");
         dot.style.background = defaultPinColor(pin);
         chip.append(dot, document.createTextNode(pin.note ? `${pin.name} (${pin.note})` : pin.name));
         row.append(chip);
@@ -1618,10 +2184,10 @@ ${tile.summary}` : ""}`;
     }
     const neighbors = Array.from(neighborIds).map((id) => layer.tiles.find((t) => t.id === id)).filter((t) => !!t);
     if (neighbors.length > 0) {
-      inspector.append(el("div", "la-insp-section-label", "Connected Routes"));
-      const row = el("div", "la-chip-row");
+      inspector.append(el2("div", "la-insp-section-label", "Connected Routes"));
+      const row = el2("div", "la-chip-row");
       for (const n of neighbors) {
-        const btn = el("button", "la-neighbor-btn", n.floor !== tile.floor ? `${n.name} (F${n.floor})` : n.name);
+        const btn = el2("button", "la-neighbor-btn", n.floor !== tile.floor ? `${n.name} (F${n.floor})` : n.name);
         btn.type = "button";
         btn.addEventListener("click", () => {
           state.floor = n.floor;
@@ -1634,7 +2200,7 @@ ${tile.summary}` : ""}`;
       inspector.append(row);
     }
     if (state.atlas?.notes && state.atlas.notes.length > 0) {
-      inspector.append(el("div", "la-notes", state.atlas.notes.join(" · ")));
+      inspector.append(el2("div", "la-notes", state.atlas.notes.join(" · ")));
     }
   }
   function renderStatusBar() {
@@ -1644,38 +2210,37 @@ ${tile.summary}` : ""}`;
     const world = state.internalState.sections.world ?? "";
     const extract = (tag) => {
       const match = world.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "i"));
-      return match?.[1]?.trim() ?? "";
+      return (match?.[1] ?? "").replace(/\u2800+/g, " ").replace(/[ \t]+/g, " ").trim();
     };
     const time = extract("time");
     const date = extract("date");
     const loc = extract("loc");
     const weather = extract("weather");
     if (time)
-      statusBar.append(el("span", "la-status-badge", `\uD83D\uDD50 ${time}`));
+      statusBar.append(el2("span", "la-status-badge", `\uD83D\uDD50 ${time}`));
     if (date)
-      statusBar.append(el("span", "la-status-badge", `\uD83D\uDCC5 ${date}`));
+      statusBar.append(el2("span", "la-status-badge", `\uD83D\uDCC5 ${date}`));
     if (loc)
-      statusBar.append(el("span", "la-status-badge", `\uD83D\uDCCD ${loc}`));
+      statusBar.append(el2("span", "la-status-badge", `\uD83D\uDCCD ${loc}`));
     if (weather)
-      statusBar.append(el("span", "la-status-badge", weather));
+      statusBar.append(el2("span", "la-status-badge", weather));
   }
-  refreshStateContent = renderStateContent;
   function renderStateContent() {
     stateContent.replaceChildren();
     if (!state.activeChatId) {
-      stateContent.append(el("p", "la-subtitle", "Open a chat to view states."));
+      stateContent.append(el2("p", "la-subtitle", "Open a chat to view states."));
       return;
     }
     if (state.internalLoading) {
-      stateContent.append(el("p", "la-subtitle", "Loading states…"));
+      stateContent.append(el2("p", "la-subtitle", "Loading states…"));
       return;
     }
     if (state.internalInvalid || state.error && !state.internalState) {
-      stateContent.append(el("p", "la-subtitle", "Unable to load states."));
+      stateContent.append(el2("p", "la-subtitle", "Unable to load states."));
       return;
     }
     if (!state.internalState) {
-      stateContent.append(el("p", "la-subtitle", "No states available for this chat."));
+      stateContent.append(el2("p", "la-subtitle", "No states available for this chat."));
       return;
     }
     const section = STATE_SECTIONS.find((s) => s.id === state.stateSection);
@@ -1683,53 +2248,19 @@ ${tile.summary}` : ""}`;
       return;
     const raw = state.internalState.sections[section.id] ?? "";
     if (!raw.trim()) {
-      stateContent.append(el("p", "la-subtitle", `No ${section.label.toLowerCase()} data available.`));
+      stateContent.append(el2("p", "la-subtitle", `No ${section.label.toLowerCase()} data available.`));
       return;
     }
-    const vexaRendered = renderWithVexaRegex(raw, section.id);
-    if (vexaRendered) {
-      stateContent.append(vexaRendered);
-      return;
-    }
-    switch (section.id) {
-      case "pair":
-        renderPairMetrics(raw, stateContent);
-        break;
-      case "dam":
-        renderDams(raw, stateContent);
-        break;
-      case "thoughts":
-        renderThoughts(raw, stateContent);
-        break;
-      case "inv":
-        renderInventory(raw, stateContent);
-        break;
-      case "notebook":
-        renderNotebook(raw, stateContent);
-        break;
-      default:
-        if (section.collapsible) {
-          renderCollapsibleCards(raw, stateContent, section.color, state.expandedCards, section.id);
-        } else {
-          renderFlatList(raw, stateContent, section.color);
-        }
-        break;
-    }
-  }
-  function renderWithVexaRegex(raw, sectionId) {
-    if (!cachedRegexScripts || cachedRegexScripts.length === 0)
-      return null;
-    try {
-      const html = applyRegexScripts(raw, cachedRegexScripts);
-      if (html === raw)
-        return null;
-      const wrapper = document.createElement("div");
-      wrapper.className = "la-vexa-gfx";
-      wrapper.innerHTML = html;
-      return wrapper;
-    } catch {
-      return null;
-    }
+    renderStateSection({
+      sectionId: section.id,
+      sectionLabel: section.label,
+      sectionColor: section.color,
+      collapsible: section.collapsible,
+      raw,
+      container: stateContent,
+      expandedCards: state.expandedCards,
+      onToggle: renderStateContent
+    });
   }
   function renderSidebar() {
     const items = sidebar.querySelectorAll(".la-sidebar-item");
@@ -1741,18 +2272,18 @@ ${tile.summary}` : ""}`;
   function renderLedger() {
     ledgerBody.replaceChildren();
     if (!state.activeChatId) {
-      ledgerBody.append(el("div", "la-ledger-empty", "Open a chat to view the ledger."));
+      ledgerBody.append(el2("div", "la-ledger-empty", "Open a chat to view the ledger."));
       return;
     }
     if (state.internalLoading) {
-      ledgerBody.append(el("div", "la-ledger-empty", "Loading…"));
+      ledgerBody.append(el2("div", "la-ledger-empty", "Loading…"));
       return;
     }
     const content = state.internalState ? revealedLedger(state.internalState.ledger) : null;
     if (content) {
-      ledgerBody.append(el("div", "la-ledger-content", content));
+      ledgerBody.append(el2("div", "la-ledger-content", content));
     } else {
-      ledgerBody.append(el("div", "la-ledger-empty", "No revealed Ledger available."));
+      ledgerBody.append(el2("div", "la-ledger-empty", "No revealed Ledger available."));
     }
   }
   function renderAll() {
@@ -1768,11 +2299,11 @@ ${tile.summary}` : ""}`;
     settingsBtn.classList.toggle("la-btn-active", state.settingsOpen);
     settingsBox.hidden = !state.settingsOpen;
     connSelect.replaceChildren();
-    const blank = el("option", undefined, state.connections.length ? "— Select a connection —" : "No connections available");
+    const blank = el2("option", undefined, state.connections.length ? "— Select a connection —" : "No connections available");
     blank.value = "";
     connSelect.append(blank);
     for (const c of state.connections) {
-      const opt = el("option", undefined, c.model ? `${c.name} (${c.model})` : c.name);
+      const opt = el2("option", undefined, c.model ? `${c.name} (${c.model})` : c.name);
       opt.value = c.id;
       connSelect.append(opt);
     }
@@ -1824,14 +2355,14 @@ ${state.stream.outputTail}`;
     zoneSelect.disabled = layers.length === 0;
     zoneSelect.replaceChildren();
     if (!layers.length) {
-      const empty = el("option", undefined, "No maps available");
+      const empty = el2("option", undefined, "No maps available");
       empty.value = "";
       zoneSelect.append(empty);
     } else {
       const activeId = state.atlas?.maps?.[state.scale]?.id ?? null;
       for (const l of layers) {
         const isCurrent = l.id === activeId;
-        const opt = el("option", undefined, `${l.name} (${l.tiles.length} ${l.tiles.length === 1 ? "tile" : "tiles"})${isCurrent ? " · Current" : ""}`);
+        const opt = el2("option", undefined, `${l.name} (${l.tiles.length} ${l.tiles.length === 1 ? "tile" : "tiles"})${isCurrent ? " · Current" : ""}`);
         opt.value = l.id;
         zoneSelect.append(opt);
       }
@@ -1843,7 +2374,7 @@ ${state.stream.outputTail}`;
       const floors = getFloors(layer);
       if (floors.length > 1) {
         for (const f of floors) {
-          const btn = el("button", `la-btn${state.floor === f ? " la-btn-active" : ""}`, `F${f}`);
+          const btn = el2("button", `la-btn${state.floor === f ? " la-btn-active" : ""}`, `F${f}`);
           btn.type = "button";
           btn.addEventListener("click", () => {
             state.floor = f;
@@ -2135,9 +2666,6 @@ ${state.stream.outputTail}`;
   });
   renderAll();
   requestInit();
-  setTimeout(() => {
-    fetchDisplayRegexes(ctx);
-  }, 100);
   return () => {
     state.destroyed = true;
     for (const off of cleanups)

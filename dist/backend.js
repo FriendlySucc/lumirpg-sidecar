@@ -2060,16 +2060,6 @@ spindle.onFrontendMessage(async (payload, userId, frontendSessionId) => {
       cancelRuntime(rt, "Atlas update cancelled.", origin);
       return;
     }
-    if (msg.type === "get_regex_scripts") {
-      const requestId = msg.requestId;
-      try {
-        const scripts = [];
-        sendToUI(userId, { type: "regex_scripts", requestId, scripts }, origin);
-      } catch {
-        sendToUI(userId, { type: "regex_scripts", requestId, scripts: [] }, origin);
-      }
-      return;
-    }
   } catch (err) {
     spindle.log.error(`LumiAtlas message handler error: ${err instanceof Error ? err.message : String(err)}`);
     emitStatus(userId, await getActiveChatId(userId), "error", err instanceof Error ? err.message : "Unexpected LumiAtlas error.", undefined, undefined, origin);

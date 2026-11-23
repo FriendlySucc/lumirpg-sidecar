@@ -487,17 +487,14 @@ describe('LumiAtlas frontend host lifecycle', () => {
     expect(memCardHead).not.toBeNull()
     memCardHead.click()
     expect(stateContent.textContent).toContain('Remembers rain')
-    // Expand the notebook card to verify XSS-safe rendering
+    // Notebook is a flat section — full text visible immediately without expanding, and XSS-safe
     show('notebook')
-    const nbCardHead = stateContent.querySelector('.la-card-head') as HTMLElement
-    expect(nbCardHead).not.toBeNull()
-    nbCardHead.click()
+    expect(stateContent.querySelector('.la-card-head')).toBeNull()
     expect(stateContent.querySelector('img')).toBeNull()
     expect(stateContent.textContent).toContain('<img src=x onerror=alert(1)>')
+    // Leads is a flat grouped section — full text visible immediately without expanding
     show('leads')
-    const leadsCardHead = stateContent.querySelector('.la-card-head') as HTMLElement
-    expect(leadsCardHead).not.toBeNull()
-    leadsCardHead.click()
+    expect(stateContent.querySelector('.la-card-head')).toBeNull()
     expect(stateContent.textContent).toContain('Follow the neon sign')
     expect(stateContent.textContent).not.toContain('Private scheme')
     host.emitBackend({ type: 'status', chatId: 'chat_abc', status: 'ready', message: 'Updated',
