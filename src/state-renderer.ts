@@ -931,7 +931,51 @@ function renderLeads(root: Element, container: HTMLElement): boolean {
   return matched
 }
 
-/* ── 14. Inventory (flat full-width pill-badged panels: ITEMS / TRAITS / STATUS) ── */
+/* ── 14. Inventory (structured sorted items + traits/status chips, zero truncation) ── */
+function splitTopLevel(raw: string): string[] {
+  const parts: string[] = []
+  let buf = ''
+  let depth = 0
+  for (const ch of raw) {
+    if (ch === '(' || ch === '[' || ch === '{') {
+      depth++
+      buf += ch
+    } else if (ch === ')' || ch === ']' || ch === '}') {
+      if (depth > 0) depth--
+      buf += ch
+    } else if ((ch === ',' || ch === ';') && depth === 0) {
+      const trimmed = buf.trim()
+      if (trimmed) parts.push(trimmed)
+      buf = ''
+    } else {
+      buf += ch
+    }
+  }
+  const tail = buf.trim()
+  if (tail) parts.push(tail)
+  return parts
+}
+
+const CURRENCY_RE = /^(?:[$€£¥₩]\s*\d|\d[\d.,]*\s*(?:eddies|eb|eurodollars?|credits?|gold|gp|sp|cp|coins?|yen|dollars?|bucks|caps|gil|septims?)\b)/i
+
+function parseItemEntry(raw: string): { main: string; detail: string; subItems: string[] } {
+  const match = raw.match(/^([^(]+?)\s*\(([\s\S]+)\)\s*$/)
+  if (!match) return { main: raw, detail: '', subItems: [] }
+  const main = match[1].trim()
+  const inner = match[2].trim()
+  // If inner has a colon followed by a multi-item list (e.g. "containing waxed canvas tool wrap: a, b, c"), split it
+  const colonIdx = inner.indexOf(':')
+  if (colonIdx > 0) {
+    const prefix = inner.slice(0, colonIdx + 1).trim()
+    const rest = inner.slice(colonIdx + 1).trim()
+    const sub = splitTopLevel(rest)
+    if (sub.length >= 2) {
+      return { main, detail: prefix, subItems: sub }
+    }
+  }
+  return { main, detail: inner, subItems: [] }
+}
+
 function renderInventory(root: Element, container: HTMLElement): boolean {
   const slots: Array<[string, string, string]> = [
     ['inv', '🎒', 'ITEMS'],
@@ -944,7 +988,50 @@ function renderInventory(root: Element, container: HTMLElement): boolean {
     if (!val) continue
     matched = true
     const box = el('div', 'la-flat-panel')
-    box.append(el('div', 'la-flat-badge', `${icon} ${label}`), el('div', 'la-flat-text', val))
+    box.append(el('div', 'la-flat-badge', `${icon} ${label}`))
+
+    const entries = splitTopLevel(val)
+    if (tag === 'inv' && entries.length > 1) {
+      const currency: string[] = []
+      const containers: Array<{ main: string; detail: string; subItems: string[] }> = []
+      const regular: Array<{ main: string; detail: string; subItems: string[] }> = []
+      for (const entry of entries) {
+        if (CURRENCY_RE.test(entry)) {
+          currency.push(entry)
+        } else {
+          const parsed = parseItemEntry(entry)
+          if (parsed.subItems.length > 0 || parsed.detail) containers.push(parsed)
+          else regular.push(parsed)
+        }
+      }
+      if (currency.length) {
+        const curRow = el('div', 'la-inv-currency-row')
+        for (const c of currency) curRow.append(el('span', 'la-inv-currency', `💰 ${c}`))
+        box.append(curRow)
+      }
+      const list = el('div', 'la-inv-list')
+      // Put simple carried items together, then containers/detailed items, alphabetically within each group
+      const sortedRegular = [...regular].sort((a, b) => a.main.localeCompare(b.main))
+      const sortedContainers = [...containers].sort((a, b) => a.main.localeCompare(b.main))
+      for (const item of [...sortedRegular, ...sortedContainers]) {
+        const row = el('div', 'la-inv-item')
+        row.append(el('div', 'la-inv-item-main', item.main))
+        if (item.detail) row.append(el('div', 'la-inv-item-detail', item.detail))
+        if (item.subItems.length) {
+          const ul = el('ul', 'la-inv-sublist')
+          for (const s of item.subItems) ul.append(el('li', undefined, s))
+          row.append(ul)
+        }
+        list.append(row)
+      }
+      box.append(list)
+    } else if ((tag === 'titles' || tag === 'status') && entries.length > 1) {
+      const chips = el('div', 'la-inv-chips')
+      for (const entry of entries) chips.append(el('span', 'la-inv-chip', entry))
+      box.append(chips)
+    } else {
+      box.append(el('div', 'la-flat-text', val))
+    }
     container.append(box)
   }
   return matched

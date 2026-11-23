@@ -145,20 +145,20 @@ const STYLES = `
   display: flex; min-height: 0; flex: 1;
 }
 .la-sidebar {
-  width: 9.5em; flex: none;
+  width: 10.5em; flex: none;
   border-right: 1px solid #2a2520;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 0.35em 0;
 }
 .la-sidebar-category {
-  padding: 4px 8px 2px;
+  padding: 0.45em 0.7em 0.2em;
   font-size: 0.75em; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em;
   color: #6a6058;
 }
 .la-sidebar-item {
-  display: flex; align-items: center; gap: 5px;
-  padding: 3px 8px; cursor: pointer;
+  display: flex; align-items: center; gap: 0.45em;
+  padding: 0.32em 0.65em; cursor: pointer;
   font-size: 0.92em; color: #a09890;
   border-left: 2px solid transparent;
   transition: background 80ms, border-color 80ms;
@@ -169,16 +169,16 @@ const STYLES = `
   border-left-color: #c4973c;
   color: #e8d5a0;
 }
-.la-sidebar-icon { width: 14px; text-align: center; flex: none; font-size: 0.92em; }
+.la-sidebar-icon { min-width: 1.45em; text-align: center; flex: none; font-size: 1em; line-height: 1.1; }
 .la-state-content {
   flex: 1; min-width: 0;
   overflow-y: auto;
-  padding: 6px;
+  padding: 0.55em;
 }
 
 /* ── Collapsible cards & native Vexa GFX ── */
 .la-card {
-  margin-bottom: 5px;
+  margin-bottom: 0.45em;
   border: 1px solid #2d2620;
   border-radius: 7px;
   background: #181411;
@@ -186,8 +186,9 @@ const STYLES = `
 }
 .la-card-open { border-color: #c4973c; }
 .la-card-head {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 9px;
+  display: flex; align-items: center; gap: 0.55em;
+  padding: 0.65em 0.8em;
+  min-height: 2.75em;
   cursor: pointer;
   transition: background 80ms;
 }
@@ -196,13 +197,13 @@ const STYLES = `
   border-bottom: 1px solid #2d2620;
   background: rgba(196,151,60,0.08);
 }
-.la-card-chevron { font-size: 0.85em; color: #c4973c; width: 1em; text-align: center; flex: none; }
-.la-card-icon { font-size: 0.95em; flex: none; }
-.la-card-name { font-weight: 700; font-size: 0.94em; color: #ece5da; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.la-card-chevron { font-size: 0.95em; color: #c4973c; width: 1.1em; text-align: center; flex: none; }
+.la-card-icon { font-size: 1.1em; min-width: 1.35em; text-align: center; line-height: 1.1; flex: none; }
+.la-card-name { font-weight: 700; font-size: 1em; color: #ece5da; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .la-loc-id { font-family: var(--lumiverse-font-mono, ui-monospace, monospace); font-size: 0.78em; color: #8a8078; background: #231e19; padding: 1px 4px; border-radius: 3px; }
 .la-card-badge {
-  font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 1px 6px; border-radius: 999px; flex: none;
+  font-size: 0.78em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 0.16em 0.55em; border-radius: 999px; flex: none;
   background: #252018; border: 1px solid #4a3d2e; color: #d4b886;
 }
 .la-card-body { padding: 7px 9px; display: flex; flex-direction: column; gap: 6px; }
@@ -254,6 +255,30 @@ const STYLES = `
 .la-kv-v { font-size: 0.9em; color: #d8d0c4; overflow-wrap: anywhere; }
 .la-color-row { display: flex; align-items: center; gap: 6px; }
 .la-color-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25); flex: none; }
+
+/* ── Inventory structured list & chips ── */
+.la-inv-currency-row { display: flex; flex-wrap: wrap; gap: 0.35em; margin-bottom: 0.3em; }
+.la-inv-currency {
+  display: inline-flex; align-items: center; gap: 0.3em;
+  padding: 0.18em 0.55em; border-radius: 999px;
+  background: rgba(196,151,60,0.14); border: 1px solid #c4973c;
+  font-size: 0.88em; font-weight: 700; color: #f0cf80;
+}
+.la-inv-list { display: flex; flex-direction: column; gap: 0.32em; }
+.la-inv-item {
+  padding: 0.38em 0.55em; border-radius: 5px;
+  background: #14110e; border: 1px solid #28221c;
+  display: flex; flex-direction: column; gap: 0.2em;
+}
+.la-inv-item-main { font-size: 0.92em; font-weight: 600; color: #ece5da; overflow-wrap: anywhere; }
+.la-inv-item-detail { font-size: 0.86em; color: #b6ada0; padding-left: 0.6em; border-left: 2px solid #3a3128; overflow-wrap: anywhere; line-height: 1.4; }
+.la-inv-sublist { margin: 0.15em 0 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 0.12em; font-size: 0.86em; color: #c4bcb0; }
+.la-inv-chips { display: flex; flex-wrap: wrap; gap: 0.35em; }
+.la-inv-chip {
+  padding: 0.2em 0.55em; border-radius: 5px;
+  background: #14110e; border: 1px solid #2e2720;
+  font-size: 0.88em; color: #ddd5c9; overflow-wrap: anywhere;
+}
 
 /* ── Notebook rows ── */
 .la-nb-row {
@@ -333,6 +358,13 @@ const STYLES = `
 .la-empty-overlay[hidden] { display: none; }
 .la-empty-overlay strong { color: #d4ccc0; font-size: 1em; }
 .la-hud-corner { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 3px; z-index: 2; }
+.la-hud-floors {
+  position: absolute; left: 6px; bottom: 6px; z-index: 2;
+  display: inline-flex; gap: 3px; align-items: center;
+  padding: 2px 3px; border-radius: 6px;
+  background: rgba(15,13,11,0.82); border: 1px solid #2a2520;
+}
+.la-hud-floors:empty { display: none; }
 .la-hud-badge { position: absolute; left: 6px; top: 6px; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; font-weight: 600; background: rgba(15,13,11,0.82); border: 1px solid #2a2520; color: #b0a898; pointer-events: none; }
 
 .la-tile-group { cursor: pointer; }
@@ -737,15 +769,16 @@ export function setup(ctx: SpindleFrontendContext) {
   const fitBtn = el('button', 'la-btn la-btn-icon', 'Fit')
   fitBtn.title = 'Fit map'
   hudCorner.append(zoomOutBtn, zoomInBtn, fitBtn)
+  const floorBar = el('div', 'la-hud-floors')
+  floorBar.setAttribute('aria-label', 'Map floors')
   const emptyOverlay = el('div', 'la-empty-overlay')
-  canvasWrap.append(svg, hudBadge, hudCorner, emptyOverlay)
+  canvasWrap.append(svg, hudBadge, floorBar, hudCorner, emptyOverlay)
 
   const mapToolbar = el('div', 'la-map-toolbar')
-  const floorBar = el('div', 'la-floors')
   const pinsToggle = el('button', 'la-btn la-btn-active', 'Pins')
   const roadsToggle = el('button', 'la-btn la-btn-active', 'Roads')
   const labelsToggle = el('button', 'la-btn la-btn-active', 'Labels')
-  mapToolbar.append(floorBar, pinsToggle, roadsToggle, labelsToggle)
+  mapToolbar.append(pinsToggle, roadsToggle, labelsToggle)
 
   const inspector = el('div', 'la-inspector')
 

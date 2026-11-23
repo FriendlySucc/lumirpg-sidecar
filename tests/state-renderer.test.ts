@@ -109,7 +109,7 @@ describe('native Vexa GFX state renderers', () => {
 
   test('Inventory and Notebook render full untruncated text flat without chevrons', () => {
     const longInv = `<state:inv>
-      <inv>41⠀eddies,⠀scratched⠀agent⠀(contacts:⠀Jessie,⠀Roman⠀Carax⠀#774-092-118),⠀canvas⠀tote⠀with⠀full⠀40W⠀reconditioned⠀Japanese⠀soldering⠀iron⠀and⠀micro-bit⠀cassette</inv>
+      <inv>41⠀eddies,⠀scratched⠀agent⠀(contacts:⠀Jessie,⠀Roman⠀Carax⠀#774-092-118),⠀canvas⠀tote⠀(containing⠀waxed⠀canvas⠀tool⠀wrap:⠀40W⠀reconditioned⠀Japanese⠀soldering⠀iron,⠀micro-bit⠀cassette),⠀Apt⠀3C⠀keycard</inv>
       <titles>Rancho⠀Coronado⠀New⠀Tenant,⠀Kabuki⠀Scrounger</titles>
       <status>Rested⠀(10h⠀sleep),⠀hungry⠀for⠀midday⠀meal</status>
     </state:inv>`
@@ -119,7 +119,12 @@ describe('native Vexa GFX state renderers', () => {
     expect(invEl.textContent).toContain('ITEMS')
     expect(invEl.textContent).toContain('TRAITS')
     expect(invEl.textContent).toContain('STATUS')
+    expect(invEl.querySelector('.la-inv-currency')?.textContent).toContain('41 eddies')
+    const itemMains = Array.from(invEl.querySelectorAll('.la-inv-item-main')).map((n) => n.textContent)
+    expect(itemMains).toEqual(['Apt 3C keycard', 'canvas tote', 'scratched agent'])
+    expect(invEl.querySelectorAll('.la-inv-sublist li').length).toBe(4)
     expect(invEl.textContent).toContain('micro-bit cassette')
+    expect(invEl.querySelectorAll('.la-inv-chip').length).toBe(4)
 
     const nbRaw = `<state:notebook>
       <ent>[T]⠀12:18⠀PM⠀Nov⠀17:⠀Kris⠀introduced⠀themselves⠀to⠀Roman⠀Carax⠀and⠀swapped⠀comm⠀numbers⠀(#774-092-118)⠀before⠀he⠀headed⠀west⠀into⠀the⠀crowd.</ent>
