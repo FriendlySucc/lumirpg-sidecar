@@ -90,8 +90,8 @@ const STYLES = `
 
 /* ── Three-section browser ── */
 .la-browser {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   min-width: 0;
 }
