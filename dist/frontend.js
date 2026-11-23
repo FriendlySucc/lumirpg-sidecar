@@ -358,6 +358,8 @@ var STYLES = `
   width: 12px; text-align: center;
 }
 .la-card-head.la-expanded .la-card-chevron { transform: rotate(90deg); }
+.la-card-head.la-flat { cursor: default; }
+.la-card-head.la-flat:hover { background: transparent; }
 .la-card-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
 .la-card-name { font-weight: 700; font-size: 11px; color: #e0d8cc; flex: 1; }
 .la-card-badge {
@@ -465,24 +467,24 @@ var STYLES = `
 .la-ledger-content { font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; color: #c4bcb0; }
 `;
 var STATE_SECTIONS = [
-  { id: "world", label: "World", icon: "\uD83C\uDF0D", category: "Scene", color: "#4e7a8c" },
-  { id: "onscreen", label: "On-Screen", icon: "\uD83D\uDC64", category: "Scene", color: "#8b5a7c" },
-  { id: "offscreen_agendas", label: "Off-Screen", icon: "\uD83C\uDF19", category: "Scene", color: "#c4973c" },
-  { id: "locations", label: "Locations", icon: "\uD83D\uDCCD", category: "Scene", color: "#e86a6a" },
-  { id: "entityMem", label: "Memory", icon: "\uD83E\uDDE0", category: "People", color: "#e86a8a" },
-  { id: "entity_state", label: "Profile", icon: "\uD83E\uDEAA", category: "People", color: "#6a8ae8" },
-  { id: "thoughts", label: "Thoughts", icon: "\uD83D\uDCAD", category: "People", color: "#a0a0a0" },
-  { id: "dam", label: "Dams", icon: "\uD83E\uDEB5", category: "Relationships", color: "#8a6a4a" },
-  { id: "pair", label: "Pairs", icon: "\uD83D\uDC9A", category: "Relationships", color: "#4ade80" },
-  { id: "reputation", label: "Reputation", icon: "⭐", category: "Relationships", color: "#e8c44e" },
-  { id: "tracks", label: "Tracks", icon: "\uD83E\uDDF5", category: "Plot", color: "#c084fc" },
-  { id: "arc", label: "Arc", icon: "\uD83D\uDCD6", category: "Plot", color: "#fb923c" },
-  { id: "chekhov", label: "Chekhov", icon: "\uD83D\uDD2B", category: "Plot", color: "#f87171" },
-  { id: "leads", label: "Leads", icon: "\uD83D\uDD0D", category: "Plot", color: "#60a5fa" },
-  { id: "inv", label: "Inventory", icon: "\uD83C\uDF92", category: "Other", color: "#a3a3a3" },
-  { id: "story_notes", label: "Story Notes", icon: "\uD83D\uDCDD", category: "Other", color: "#a3a3a3" },
-  { id: "notebook", label: "Notebook", icon: "\uD83D\uDCD3", category: "Other", color: "#a3a3a3" },
-  { id: "vent", label: "Vent", icon: "\uD83D\uDCA8", category: "Other", color: "#a3a3a3" }
+  { id: "world", label: "World", icon: "\uD83C\uDF0D", category: "Scene", color: "#4e7a8c", collapsible: false },
+  { id: "onscreen", label: "On-Screen", icon: "\uD83D\uDC64", category: "Scene", color: "#8b5a7c", collapsible: true },
+  { id: "offscreen_agendas", label: "Off-Screen", icon: "\uD83C\uDF19", category: "Scene", color: "#c4973c", collapsible: true },
+  { id: "locations", label: "Locations", icon: "\uD83D\uDCCD", category: "Scene", color: "#e86a6a", collapsible: true },
+  { id: "entityMem", label: "Memory", icon: "\uD83E\uDDE0", category: "People", color: "#e86a8a", collapsible: true },
+  { id: "entity_state", label: "Profile", icon: "\uD83E\uDEAA", category: "People", color: "#6a8ae8", collapsible: true },
+  { id: "thoughts", label: "Thoughts", icon: "\uD83D\uDCAD", category: "People", color: "#a0a0a0", collapsible: true },
+  { id: "dam", label: "Dams", icon: "\uD83E\uDEB5", category: "Relationships", color: "#8a6a4a", collapsible: true },
+  { id: "pair", label: "Pairs", icon: "\uD83D\uDC9A", category: "Relationships", color: "#4ade80", collapsible: true },
+  { id: "reputation", label: "Reputation", icon: "⭐", category: "Relationships", color: "#e8c44e", collapsible: true },
+  { id: "tracks", label: "Tracks", icon: "\uD83E\uDDF5", category: "Plot", color: "#c084fc", collapsible: false },
+  { id: "arc", label: "Arc", icon: "\uD83D\uDCD6", category: "Plot", color: "#fb923c", collapsible: false },
+  { id: "chekhov", label: "Chekhov", icon: "\uD83D\uDD2B", category: "Plot", color: "#f87171", collapsible: false },
+  { id: "leads", label: "Leads", icon: "\uD83D\uDD0D", category: "Plot", color: "#60a5fa", collapsible: false },
+  { id: "inv", label: "Inventory", icon: "\uD83C\uDF92", category: "Other", color: "#a3a3a3", collapsible: false },
+  { id: "story_notes", label: "Story Notes", icon: "\uD83D\uDCDD", category: "Other", color: "#a3a3a3", collapsible: false },
+  { id: "notebook", label: "Notebook", icon: "\uD83D\uDCD3", category: "Other", color: "#a3a3a3", collapsible: false },
+  { id: "vent", label: "Vent", icon: "\uD83D\uDCA8", category: "Other", color: "#a3a3a3", collapsible: false }
 ];
 var CATEGORIES = ["Scene", "People", "Relationships", "Plot", "Other"];
 function readInternalSnapshot(raw) {
@@ -1267,16 +1269,60 @@ ${tile.summary}` : ""}`;
       const cardId = `${section.id}:${record.name}`;
       const isExpanded = state.expandedCards.has(cardId);
       const card = el("div", "la-card");
-      const head = el("div", `la-card-head${isExpanded ? " la-expanded" : ""}`);
-      const chevron = el("span", "la-card-chevron", isExpanded ? "▾" : "▸");
-      const dot = el("span", "la-card-dot");
-      dot.style.background = section.color;
-      const name = el("span", "la-card-name", record.name);
-      head.append(chevron, dot, name);
-      if (record.badge)
-        head.append(el("span", "la-card-badge", record.badge));
-      card.append(head);
-      if (isExpanded) {
+      if (section.collapsible) {
+        const head = el("div", `la-card-head${isExpanded ? " la-expanded" : ""}`);
+        const chevron = el("span", "la-card-chevron", isExpanded ? "▾" : "▸");
+        const dot = el("span", "la-card-dot");
+        dot.style.background = section.color;
+        const name = el("span", "la-card-name", record.name);
+        head.append(chevron, dot, name);
+        if (record.badge)
+          head.append(el("span", "la-card-badge", record.badge));
+        card.append(head);
+        if (isExpanded) {
+          const body = el("div", "la-card-body");
+          if (record.location) {
+            body.append(el("div", "la-card-location", `→ ${record.location}`));
+          }
+          if (record.fields.length) {
+            const fields = el("div", "la-card-fields");
+            for (const field of record.fields) {
+              const fieldEl = el("div", "la-card-field");
+              fieldEl.append(el("span", "la-card-field-label", field.label));
+              fieldEl.append(el("span", "la-card-field-value", field.value));
+              fields.append(fieldEl);
+            }
+            body.append(fields);
+          }
+          if (record.details.length) {
+            for (const detail of record.details) {
+              const detailEl = el("div", "la-card-detail");
+              detailEl.append(el("div", "la-card-detail-title", detail.title));
+              detailEl.append(el("div", "la-card-detail-text", detail.text));
+              body.append(detailEl);
+            }
+          }
+          if (record.rawText && !record.fields.length && !record.details.length) {
+            body.append(el("div", "la-card-detail-text", record.rawText));
+          }
+          card.append(body);
+        }
+        head.addEventListener("click", () => {
+          if (state.expandedCards.has(cardId))
+            state.expandedCards.delete(cardId);
+          else
+            state.expandedCards.add(cardId);
+          renderStateContent();
+        });
+      } else {
+        const head = el("div", "la-card-head la-flat");
+        const dot = el("span", "la-card-dot");
+        dot.style.background = section.color;
+        const name = el("span", "la-card-name", record.name);
+        head.append(dot, name);
+        if (record.badge)
+          head.append(el("span", "la-card-badge", record.badge));
+        card.append(head);
         const body = el("div", "la-card-body");
         if (record.location) {
           body.append(el("div", "la-card-location", `→ ${record.location}`));
@@ -1304,13 +1350,6 @@ ${tile.summary}` : ""}`;
         }
         card.append(body);
       }
-      head.addEventListener("click", () => {
-        if (state.expandedCards.has(cardId))
-          state.expandedCards.delete(cardId);
-        else
-          state.expandedCards.add(cardId);
-        renderStateContent();
-      });
       stateContent.append(card);
     }
   }

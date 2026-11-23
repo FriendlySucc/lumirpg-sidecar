@@ -200,6 +200,8 @@ const STYLES = `
   width: 12px; text-align: center;
 }
 .la-card-head.la-expanded .la-card-chevron { transform: rotate(90deg); }
+.la-card-head.la-flat { cursor: default; }
+.la-card-head.la-flat:hover { background: transparent; }
 .la-card-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
 .la-card-name { font-weight: 700; font-size: 11px; color: #e0d8cc; flex: 1; }
 .la-card-badge {
@@ -312,24 +314,24 @@ interface StreamPreview { phase: 'thinking' | 'writing'; reasoning: string; outp
 
 /* ── State section definitions with icons ── */
 const STATE_SECTIONS = [
-  { id: 'world', label: 'World', icon: '🌍', category: 'Scene', color: '#4e7a8c' },
-  { id: 'onscreen', label: 'On-Screen', icon: '👤', category: 'Scene', color: '#8b5a7c' },
-  { id: 'offscreen_agendas', label: 'Off-Screen', icon: '🌙', category: 'Scene', color: '#c4973c' },
-  { id: 'locations', label: 'Locations', icon: '📍', category: 'Scene', color: '#e86a6a' },
-  { id: 'entityMem', label: 'Memory', icon: '🧠', category: 'People', color: '#e86a8a' },
-  { id: 'entity_state', label: 'Profile', icon: '🪪', category: 'People', color: '#6a8ae8' },
-  { id: 'thoughts', label: 'Thoughts', icon: '💭', category: 'People', color: '#a0a0a0' },
-  { id: 'dam', label: 'Dams', icon: '🪵', category: 'Relationships', color: '#8a6a4a' },
-  { id: 'pair', label: 'Pairs', icon: '💚', category: 'Relationships', color: '#4ade80' },
-  { id: 'reputation', label: 'Reputation', icon: '⭐', category: 'Relationships', color: '#e8c44e' },
-  { id: 'tracks', label: 'Tracks', icon: '🧵', category: 'Plot', color: '#c084fc' },
-  { id: 'arc', label: 'Arc', icon: '📖', category: 'Plot', color: '#fb923c' },
-  { id: 'chekhov', label: 'Chekhov', icon: '🔫', category: 'Plot', color: '#f87171' },
-  { id: 'leads', label: 'Leads', icon: '🔍', category: 'Plot', color: '#60a5fa' },
-  { id: 'inv', label: 'Inventory', icon: '🎒', category: 'Other', color: '#a3a3a3' },
-  { id: 'story_notes', label: 'Story Notes', icon: '📝', category: 'Other', color: '#a3a3a3' },
-  { id: 'notebook', label: 'Notebook', icon: '📓', category: 'Other', color: '#a3a3a3' },
-  { id: 'vent', label: 'Vent', icon: '💨', category: 'Other', color: '#a3a3a3' },
+  { id: 'world', label: 'World', icon: '🌍', category: 'Scene', color: '#4e7a8c', collapsible: false },
+  { id: 'onscreen', label: 'On-Screen', icon: '👤', category: 'Scene', color: '#8b5a7c', collapsible: true },
+  { id: 'offscreen_agendas', label: 'Off-Screen', icon: '🌙', category: 'Scene', color: '#c4973c', collapsible: true },
+  { id: 'locations', label: 'Locations', icon: '📍', category: 'Scene', color: '#e86a6a', collapsible: true },
+  { id: 'entityMem', label: 'Memory', icon: '🧠', category: 'People', color: '#e86a8a', collapsible: true },
+  { id: 'entity_state', label: 'Profile', icon: '🪪', category: 'People', color: '#6a8ae8', collapsible: true },
+  { id: 'thoughts', label: 'Thoughts', icon: '💭', category: 'People', color: '#a0a0a0', collapsible: true },
+  { id: 'dam', label: 'Dams', icon: '🪵', category: 'Relationships', color: '#8a6a4a', collapsible: true },
+  { id: 'pair', label: 'Pairs', icon: '💚', category: 'Relationships', color: '#4ade80', collapsible: true },
+  { id: 'reputation', label: 'Reputation', icon: '⭐', category: 'Relationships', color: '#e8c44e', collapsible: true },
+  { id: 'tracks', label: 'Tracks', icon: '🧵', category: 'Plot', color: '#c084fc', collapsible: false },
+  { id: 'arc', label: 'Arc', icon: '📖', category: 'Plot', color: '#fb923c', collapsible: false },
+  { id: 'chekhov', label: 'Chekhov', icon: '🔫', category: 'Plot', color: '#f87171', collapsible: false },
+  { id: 'leads', label: 'Leads', icon: '🔍', category: 'Plot', color: '#60a5fa', collapsible: false },
+  { id: 'inv', label: 'Inventory', icon: '🎒', category: 'Other', color: '#a3a3a3', collapsible: false },
+  { id: 'story_notes', label: 'Story Notes', icon: '📝', category: 'Other', color: '#a3a3a3', collapsible: false },
+  { id: 'notebook', label: 'Notebook', icon: '📓', category: 'Other', color: '#a3a3a3', collapsible: false },
+  { id: 'vent', label: 'Vent', icon: '💨', category: 'Other', color: '#a3a3a3', collapsible: false },
 ] as const
 
 type StateSectionId = (typeof STATE_SECTIONS)[number]['id']
@@ -1179,16 +1181,63 @@ export function setup(ctx: SpindleFrontendContext) {
       const isExpanded = state.expandedCards.has(cardId)
 
       const card = el('div', 'la-card')
-      const head = el('div', `la-card-head${isExpanded ? ' la-expanded' : ''}`)
-      const chevron = el('span', 'la-card-chevron', isExpanded ? '▾' : '▸')
-      const dot = el('span', 'la-card-dot')
-      dot.style.background = section.color
-      const name = el('span', 'la-card-name', record.name)
-      head.append(chevron, dot, name)
-      if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
-      card.append(head)
 
-      if (isExpanded) {
+      if (section.collapsible) {
+        // ── Collapsible record card (character, location, etc.) ──
+        const head = el('div', `la-card-head${isExpanded ? ' la-expanded' : ''}`)
+        const chevron = el('span', 'la-card-chevron', isExpanded ? '▾' : '▸')
+        const dot = el('span', 'la-card-dot')
+        dot.style.background = section.color
+        const name = el('span', 'la-card-name', record.name)
+        head.append(chevron, dot, name)
+        if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
+        card.append(head)
+
+        if (isExpanded) {
+          const body = el('div', 'la-card-body')
+          if (record.location) {
+            body.append(el('div', 'la-card-location', `→ ${record.location}`))
+          }
+          if (record.fields.length) {
+            const fields = el('div', 'la-card-fields')
+            for (const field of record.fields) {
+              const fieldEl = el('div', 'la-card-field')
+              fieldEl.append(el('span', 'la-card-field-label', field.label))
+              fieldEl.append(el('span', 'la-card-field-value', field.value))
+              fields.append(fieldEl)
+            }
+            body.append(fields)
+          }
+          if (record.details.length) {
+            for (const detail of record.details) {
+              const detailEl = el('div', 'la-card-detail')
+              detailEl.append(el('div', 'la-card-detail-title', detail.title))
+              detailEl.append(el('div', 'la-card-detail-text', detail.text))
+              body.append(detailEl)
+            }
+          }
+          if (record.rawText && !record.fields.length && !record.details.length) {
+            body.append(el('div', 'la-card-detail-text', record.rawText))
+          }
+          card.append(body)
+        }
+
+        head.addEventListener('click', () => {
+          if (state.expandedCards.has(cardId)) state.expandedCards.delete(cardId)
+          else state.expandedCards.add(cardId)
+          renderStateContent()
+        })
+      } else {
+        // ── Flat labeled section (inventory, notebook, world, etc.) ──
+        const head = el('div', 'la-card-head la-flat')
+        const dot = el('span', 'la-card-dot')
+        dot.style.background = section.color
+        const name = el('span', 'la-card-name', record.name)
+        head.append(dot, name)
+        if (record.badge) head.append(el('span', 'la-card-badge', record.badge))
+        card.append(head)
+
+        // Always show content for flat sections
         const body = el('div', 'la-card-body')
         if (record.location) {
           body.append(el('div', 'la-card-location', `→ ${record.location}`))
@@ -1216,12 +1265,6 @@ export function setup(ctx: SpindleFrontendContext) {
         }
         card.append(body)
       }
-
-      head.addEventListener('click', () => {
-        if (state.expandedCards.has(cardId)) state.expandedCards.delete(cardId)
-        else state.expandedCards.add(cardId)
-        renderStateContent()
-      })
 
       stateContent.append(card)
     }
