@@ -412,8 +412,18 @@ function pathTag(value: unknown): string {
   return value
 }
 
-function resolvePath(xml: string, root: XmlNode, path: unknown): XmlNode {
-  if (!Array.isArray(path)) throw new Error('Invalid operation path')
+const SECTION_CONTAINERS: Record<string, readonly string[]> = {
+  leads: ['active_leads', 'usable', 'resolved_leads'],
+  chekhov: ['chamber', 'locked', 'fired'],
+}
+
+const SECTION_SCALAR_CHILDREN: Record<string, readonly string[]> = {
+  arc: ['info', 'timeline', 'ki', 'sho', 'ten', 'ketsu'],
+  tracks: ['main'],
+}
+
+function resolvePath(xml: string, root: XmlNode, path: unknown, sectionName: string): XmlNode {
+  if (!Array.isArray(path)) throw new Error(`Invalid operation path in ${sectionName}`)
   let current = root
   for (const step of path) {
     let tag: string
@@ -437,7 +447,11 @@ function resolvePath(xml: string, root: XmlNode, path: unknown): XmlNode {
       if (ids.length !== 1) throw new Error('Invalid path identity')
       return nodeText(xml, ids[0]) === where.value
     })
-    if (candidates.length !== 1) throw new Error('Missing or ambiguous operation path')
+    if (candidates.length !== 1) {
+      const label = where ? `${tag}[${String(where.tag)}=${String(where.value)}]` : tag
+      const kind = candidates.length === 0 ? 'Missing' : `Ambiguous (${candidates.length} matches)`
+      throw new Error(`${kind} operation path in ${sectionName}: ${label}`)
+    }
     current = candidates[0]
   }
   return current
@@ -448,22 +462,46 @@ function applyOperations(section: string, name: string, operations: unknown): st
   if (!Array.isArray(operations) || !operations.length) throw new Error('Invalid operations')
   for (const item of operations) {
     const operation = plainObject(item, 'operation')
-    const root = sectionRoot(section, name)
+    let root = sectionRoot(section, name)
     if (operation.op === 'set') {
       onlyKeys(operation, ['op', 'path', 'value'], 'operation')
-      if (typeof operation.value !== 'string') throw new Error('Invalid set value')
-      const target = resolvePath(section, root, operation.path)
+      const strVal = typeof operation.value === 'string'
+        ? operation.value
+        : (typeof operation.value === 'number' && Number.isFinite(operation.value) ? String(operation.value) : null)
+      if (strVal === null) throw new Error('Invalid set value')
+      const setStep = Array.isArray(operation.path) && operation.path.length === 1 && typeof operation.path[0] === 'string' ? operation.path[0] : null
+      if (
+        setStep &&
+        SECTION_SCALAR_CHILDREN[name]?.includes(setStep) &&
+        !root.children.some(child => child.name === setStep)
+      ) {
+        const tag = pathTag(setStep)
+        section = insertInto(section, root, `<${tag}>${escapeText(strVal)}</${tag}>`)
+        sectionRoot(section, name)
+        continue
+      }
+      const target = resolvePath(section, root, operation.path, name)
       if (['name', 'names', 'pair'].includes(target.name)) throw new Error('Identity fields cannot be changed by generic set')
       if (target === root || target.children.length || (!target.selfClosing && section.slice(target.openEnd, target.closeStart).includes('<'))) throw new Error('Set target is not scalar')
       if (/\s+[A-Za-z_:]/.test(section.slice(target.start, target.openEnd))) throw new Error('Field attributes cannot be replaced')
-      const replacement = `<${target.name}>${escapeText(operation.value)}</${target.name}>`
+      const replacement = `<${target.name}>${escapeText(strVal)}</${target.name}>`
       section = section.slice(0, target.start) + replacement + section.slice(target.end)
     } else if (operation.op === 'append') {
       onlyKeys(operation, ['op', 'path', 'xml'], 'operation')
       if (typeof operation.xml !== 'string') throw new Error('Invalid append content')
       const fragment = parseXml(operation.xml)
       if (fragment.start !== 0 || fragment.end !== operation.xml.length || fragment.name.startsWith('state:') || fragment.name === 'internal_states') throw new Error('Invalid append element')
-      const target = resolvePath(section, root, operation.path)
+      const appendStep = Array.isArray(operation.path) && operation.path.length === 1 && typeof operation.path[0] === 'string' ? operation.path[0] : null
+      if (
+        appendStep &&
+        SECTION_CONTAINERS[name]?.includes(appendStep) &&
+        !root.children.some(child => child.name === appendStep)
+      ) {
+        const containerTag = pathTag(appendStep)
+        section = insertInto(section, root, `<${containerTag}></${containerTag}>`)
+        root = sectionRoot(section, name)
+      }
+      const target = resolvePath(section, root, operation.path, name)
       for (const identity of ['name', 'names', 'pair']) {
         const ids = fragment.children.filter(child => child.name === identity)
         if (ids.length > 1) throw new Error('Ambiguous appended identity')

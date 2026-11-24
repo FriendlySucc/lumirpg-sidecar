@@ -869,9 +869,17 @@ function pathTag(value) {
     throw new Error("Invalid path tag");
   return value;
 }
-function resolvePath(xml, root, path) {
+var SECTION_CONTAINERS = {
+  leads: ["active_leads", "usable", "resolved_leads"],
+  chekhov: ["chamber", "locked", "fired"]
+};
+var SECTION_SCALAR_CHILDREN = {
+  arc: ["info", "timeline", "ki", "sho", "ten", "ketsu"],
+  tracks: ["main"]
+};
+function resolvePath(xml, root, path, sectionName) {
   if (!Array.isArray(path))
-    throw new Error("Invalid operation path");
+    throw new Error(`Invalid operation path in ${sectionName}`);
   let current = root;
   for (const step of path) {
     let tag;
@@ -900,8 +908,11 @@ function resolvePath(xml, root, path) {
         throw new Error("Invalid path identity");
       return nodeText(xml, ids[0]) === where.value;
     });
-    if (candidates.length !== 1)
-      throw new Error("Missing or ambiguous operation path");
+    if (candidates.length !== 1) {
+      const label = where ? `${tag}[${String(where.tag)}=${String(where.value)}]` : tag;
+      const kind = candidates.length === 0 ? "Missing" : `Ambiguous (${candidates.length} matches)`;
+      throw new Error(`${kind} operation path in ${sectionName}: ${label}`);
+    }
     current = candidates[0];
   }
   return current;
@@ -911,19 +922,27 @@ function applyOperations(section, name, operations) {
     throw new Error("Invalid operations");
   for (const item of operations) {
     const operation = plainObject(item, "operation");
-    const root = sectionRoot(section, name);
+    let root = sectionRoot(section, name);
     if (operation.op === "set") {
       onlyKeys(operation, ["op", "path", "value"], "operation");
-      if (typeof operation.value !== "string")
+      const strVal = typeof operation.value === "string" ? operation.value : typeof operation.value === "number" && Number.isFinite(operation.value) ? String(operation.value) : null;
+      if (strVal === null)
         throw new Error("Invalid set value");
-      const target = resolvePath(section, root, operation.path);
+      const setStep = Array.isArray(operation.path) && operation.path.length === 1 && typeof operation.path[0] === "string" ? operation.path[0] : null;
+      if (setStep && SECTION_SCALAR_CHILDREN[name]?.includes(setStep) && !root.children.some((child) => child.name === setStep)) {
+        const tag = pathTag(setStep);
+        section = insertInto(section, root, `<${tag}>${escapeText(strVal)}</${tag}>`);
+        sectionRoot(section, name);
+        continue;
+      }
+      const target = resolvePath(section, root, operation.path, name);
       if (["name", "names", "pair"].includes(target.name))
         throw new Error("Identity fields cannot be changed by generic set");
       if (target === root || target.children.length || !target.selfClosing && section.slice(target.openEnd, target.closeStart).includes("<"))
         throw new Error("Set target is not scalar");
       if (/\s+[A-Za-z_:]/.test(section.slice(target.start, target.openEnd)))
         throw new Error("Field attributes cannot be replaced");
-      const replacement = `<${target.name}>${escapeText(operation.value)}</${target.name}>`;
+      const replacement = `<${target.name}>${escapeText(strVal)}</${target.name}>`;
       section = section.slice(0, target.start) + replacement + section.slice(target.end);
     } else if (operation.op === "append") {
       onlyKeys(operation, ["op", "path", "xml"], "operation");
@@ -932,7 +951,13 @@ function applyOperations(section, name, operations) {
       const fragment = parseXml(operation.xml);
       if (fragment.start !== 0 || fragment.end !== operation.xml.length || fragment.name.startsWith("state:") || fragment.name === "internal_states")
         throw new Error("Invalid append element");
-      const target = resolvePath(section, root, operation.path);
+      const appendStep = Array.isArray(operation.path) && operation.path.length === 1 && typeof operation.path[0] === "string" ? operation.path[0] : null;
+      if (appendStep && SECTION_CONTAINERS[name]?.includes(appendStep) && !root.children.some((child) => child.name === appendStep)) {
+        const containerTag = pathTag(appendStep);
+        section = insertInto(section, root, `<${containerTag}></${containerTag}>`);
+        root = sectionRoot(section, name);
+      }
+      const target = resolvePath(section, root, operation.path, name);
       for (const identity of ["name", "names", "pair"]) {
         const ids = fragment.children.filter((child) => child.name === identity);
         if (ids.length > 1)
@@ -1200,7 +1225,7 @@ All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and
   leads: <active_leads><lead>..</lead></active_leads><usable><lead>..</lead></usable>
   notebook: <ent>..</ent>
 Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
-For non-empty existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) ALWAYS use precise operations: {"ops":[{"op":"set","path":["container",{"tag":"record","where":{"tag":"name","value":"exact name"}},"field"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":["container"],"xml":"<entry>new text</entry>"}]} to append an XML element (use "path":[] to append directly inside <state:name>). Paths must identify existing nodes unambiguously. NEVER send a raw XML string for a non-empty existing section. Only for missing or currently empty sections (e.g. <state:leads></state:leads>) may a full well-formed <state:name>...</state:name> XML string be provided.
+For non-empty existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) ALWAYS use precise operations: {"ops":[{"op":"set","path":[{"tag":"ent_rep","where":{"tag":"name","value":"exact name"}},"standing"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":[],"xml":"<ent>new text</ent>"}]} to append directly inside <state:name>. Use "path":[] for locations, reputation, tracks, and notebook (do NOT invent a wrapper tag); use "path":["active_leads"] / ["usable"] / ["resolved_leads"] for leads and "path":["chamber"] / ["locked"] / ["fired"] for chekhov. Paths must identify existing nodes unambiguously. NEVER send a raw XML string for a non-empty existing section. Only for missing or currently empty sections (e.g. <state:leads></state:leads>) may a full well-formed <state:name>...</state:name> XML string be provided.
 
 For location map updates, put only changed maps under mapPatch local/region/world. ${mapInitNote}Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. Do not replace or omit existing tiles/roads.
 Map geometry rules (REQUIRED for readable maps):

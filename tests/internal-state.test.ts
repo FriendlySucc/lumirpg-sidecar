@@ -283,6 +283,23 @@ test('generic ops match the background analyzer contract', () => {
   const current = { sections: { tracks: '<state:tracks><track><name>A</name><value>old</value></track></state:tracks>' } }
   const next = applyStateDelta(current, { tracks: { ops: [{ op: 'set', path: ['track', 'value'], value: 'new' }] } })
   expect(next.sections.tracks).toContain('<value>new</value>')
+  // Missing known containers in leads/chekhov and known stages in arc are created safely
+  const partial = {
+    sections: {
+      leads: '<state:leads><active_leads><lead>Keep me</lead></active_leads></state:leads>',
+      chekhov: '<state:chekhov><chamber><bullet>Loaded gun</bullet></chamber></state:chekhov>',
+      arc: '<state:arc><info>Act 1</info><ki>Betrayal</ki></state:arc>',
+    },
+  }
+  const extended = applyStateDelta(partial, {
+    leads: { ops: [{ op: 'append', path: ['usable'], xml: '<lead>Guild debt</lead>' }] },
+    chekhov: { ops: [{ op: 'append', path: ['locked'], xml: '<bullet>Broken seal</bullet>' }] },
+    arc: { ops: [{ op: 'set', path: ['sho'], value: 'Escape from the ruins' }] },
+  })
+  expect(extended.sections.leads).toContain('<lead>Keep me</lead>')
+  expect(extended.sections.leads).toContain('<usable><lead>Guild debt</lead></usable>')
+  expect(extended.sections.chekhov).toContain('<locked><bullet>Broken seal</bullet></locked>')
+  expect(extended.sections.arc).toContain('<sho>Escape from the ruins</sho>')
 })
 
 test('generic append cannot add duplicate identified records', () => {
