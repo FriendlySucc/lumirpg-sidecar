@@ -123,3 +123,27 @@ test('manual rebuild starts from a clean map instead of stacking onto old tiles'
   await waitUntil(()=>writes.get(chatKey).state.maps.local.tiles.length === 0)
   expect(writes.get(chatKey).state.maps.local.tiles).toHaveLength(0)
 })
+
+test('MESSAGE_EDITED on a newer reply or metadata-only update does not falsely mark chat stale', async()=>{
+  waitForRelease = false
+  nextMapPatch = {}
+  const beforeCount = requests.length
+  messages.push(
+    { id:'u3', role:'user', name:'Kris Lyons', content:'I walk down Guild Row.', swipe_id:0, hidden:false },
+    { id:'a3', role:'assistant', content:'The lanterns flicker along Guild Row.', swipe_id:0, hidden:false },
+  )
+  emit('GENERATION_STARTED', { chatId:chat, generationId:'g3', generationType:'normal' })
+  // Host emits MESSAGE_EDITED while finalizing the brand-new assistant reply and saving token metadata
+  emit('MESSAGE_EDITED', { chatId:chat, message:{ id:'a3' } })
+  emit('MESSAGE_EDITED', { chatId:chat, message:{ id:'a2' } })
+  emit('GENERATION_ENDED', { chatId:chat, generationId:'g3', generationType:'normal', messageId:'a3' })
+  await waitUntil(()=>requests.length > beforeCount)
+  await waitUntil(()=>writes.get(chatKey).state.analyzedMessageId === 'a3')
+  expect(writes.get(chatKey).state.stale).toBe(false)
+
+  // Genuine edit to the analyzed message content DOES mark stale
+  messages[messages.length - 1].content = 'Manually edited assistant reply.'
+  emit('MESSAGE_EDITED', { chatId:chat, message:{ id:'a3' } })
+  await waitUntil(()=>writes.get(chatKey).state.stale === true)
+  expect(writes.get(chatKey).state.stale).toBe(true)
+})

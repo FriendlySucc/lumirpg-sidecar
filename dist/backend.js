@@ -1746,6 +1746,7 @@ async function readRecentMessages(chatId) {
   const visible = slice.filter((m) => m && !m.hidden && (m.role === "user" || m.role === "assistant") && typeof m.content === "string");
   const messages = [];
   const originalMessages = [];
+  const sources = [];
   let latestSource = null;
   let latestMessageId = null;
   let playerName = null;
@@ -1760,9 +1761,10 @@ async function readRecentMessages(chatId) {
     if (typeof msg.id === "string" && msg.id) {
       latestMessageId = msg.id;
       latestSource = { id: msg.id, role: msg.role, swipe_id: Number.isInteger(msg.swipe_id) ? msg.swipe_id : 0, content: msg.content };
+      sources.push(latestSource);
     }
   }
-  return { messages, originalMessages, latestSource, latestMessageId, playerName, totalRead: visible.length };
+  return { messages, originalMessages, sources, latestSource, latestMessageId, playerName, totalRead: visible.length };
 }
 async function readStoryBackground(chatId, userId, characterId) {
   const parts = [];
@@ -2274,13 +2276,61 @@ spindle.permissions.onChanged(({ permission, granted }) => {
     }
   }
 });
+function eventMessageId(payload) {
+  if (!payload || typeof payload !== "object")
+    return null;
+  const row = payload;
+  if (typeof row.messageId === "string" && row.messageId)
+    return row.messageId;
+  const msg = row.message;
+  if (msg && typeof msg === "object" && typeof msg.id === "string") {
+    const id = msg.id;
+    if (id)
+      return id;
+  }
+  return null;
+}
+async function reconcileHistoryEvent(rt, eventName, payload) {
+  const record = await loadChatRecord(rt);
+  const analyzedId = record.sourceRevision?.id ?? record.state.analyzedMessageId;
+  if (!analyzedId)
+    return;
+  const { sources, totalRead } = await readRecentMessages(rt.chatId);
+  const analyzedIdx = sources.findIndex((s) => s.id === analyzedId);
+  const msgId = eventMessageId(payload);
+  if (eventName === "MESSAGE_DELETED") {
+    const analyzedIntact = analyzedIdx >= 0 && (!record.sourceRevision || sameSourceRevision(record.sourceRevision, sources[analyzedIdx])) && totalRead >= record.state.analyzedMessageCount;
+    if (analyzedIntact)
+      return;
+    cancelRuntime(rt);
+    await markStale(rt, "Chat history changed (edit, delete, or swipe). Use Rebuild to re-simulate from the current transcript.", eventOrigin(payload));
+    return;
+  }
+  if (analyzedIdx >= 0) {
+    if (record.sourceRevision && !sameSourceRevision(record.sourceRevision, sources[analyzedIdx])) {
+      cancelRuntime(rt);
+      await markStale(rt, "Chat history changed (edit, delete, or swipe). Use Rebuild to re-simulate from the current transcript.", eventOrigin(payload));
+      return;
+    }
+    if (msgId && msgId === analyzedId)
+      return;
+    const eventIdx = msgId ? sources.findIndex((s) => s.id === msgId) : -1;
+    if (eventIdx > analyzedIdx)
+      return;
+    if (!msgId && rt.generation && (rt.generation.start.generationType === undefined || rt.generation.start.generationType === "normal"))
+      return;
+  } else if (msgId && sources.some((s) => s.id === msgId)) {
+    return;
+  }
+  cancelRuntime(rt);
+  await markStale(rt, "Chat history changed (edit, delete, or swipe). Use Rebuild to re-simulate from the current transcript.", eventOrigin(payload));
+}
 for (const ev of ["MESSAGE_EDITED", "MESSAGE_DELETED", "MESSAGE_SWIPED", "SWIPE_EDITED"]) {
   spindle.on(ev, (payload, userId) => {
     const rt = eventRuntime(payload, userId);
     if (!rt)
       return;
-    cancelRuntime(rt);
-    enqueue(rt, () => markStale(rt, "Chat history changed (edit, delete, or swipe). Use Rebuild to re-simulate from the current transcript.", eventOrigin(payload)));
+    enqueue(rt, () => reconcileHistoryEvent(rt, ev, payload));
   });
 }
 spindle.onFrontendMessage(async (payload, userId, frontendSessionId) => {

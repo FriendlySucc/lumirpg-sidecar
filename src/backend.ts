@@ -269,6 +269,7 @@ export function prepareMessageText(raw: string): string {
 async function readRecentMessages(chatId: string): Promise<{
   messages: PromptMessage[]
   originalMessages: PromptMessage[]
+  sources: SourceRevision[]
   latestSource: SourceRevision | null
   latestMessageId: string | null
   playerName: string | null
@@ -291,6 +292,7 @@ async function readRecentMessages(chatId: string): Promise<{
 
   const messages: PromptMessage[] = []
   const originalMessages: PromptMessage[] = []
+  const sources: SourceRevision[] = []
   let latestSource: SourceRevision | null = null
   let latestMessageId: string | null = null
   let playerName: string | null = null
@@ -304,10 +306,11 @@ async function readRecentMessages(chatId: string): Promise<{
     if (typeof msg.id === 'string' && msg.id) {
       latestMessageId = msg.id
       latestSource = { id: msg.id, role: msg.role, swipe_id: Number.isInteger(msg.swipe_id) ? msg.swipe_id : 0, content: msg.content }
+      sources.push(latestSource)
     }
   }
 
-  return { messages, originalMessages, latestSource, latestMessageId, playerName, totalRead: visible.length }
+  return { messages, originalMessages, sources, latestSource, latestMessageId, playerName, totalRead: visible.length }
 }
 
 /** Read character card, active persona, and attached lorebook context when permissions are granted. */
@@ -842,14 +845,69 @@ spindle.permissions.onChanged(({ permission, granted }) => {
   }
 })
 
+function eventMessageId(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  const row = payload as Record<string, unknown>
+  if (typeof row.messageId === 'string' && row.messageId) return row.messageId
+  const msg = row.message
+  if (msg && typeof msg === 'object' && typeof (msg as Record<string, unknown>).id === 'string') {
+    const id = (msg as Record<string, unknown>).id as string
+    if (id) return id
+  }
+  return null
+}
+
+async function reconcileHistoryEvent(
+  rt: ChatRuntime,
+  eventName: 'MESSAGE_EDITED' | 'MESSAGE_DELETED' | 'MESSAGE_SWIPED' | 'SWIPE_EDITED',
+  payload: unknown,
+): Promise<void> {
+  const record = await loadChatRecord(rt)
+  const analyzedId = record.sourceRevision?.id ?? record.state.analyzedMessageId
+  if (!analyzedId) return
+
+  const { sources, totalRead } = await readRecentMessages(rt.chatId)
+  const analyzedIdx = sources.findIndex((s) => s.id === analyzedId)
+  const msgId = eventMessageId(payload)
+
+  if (eventName === 'MESSAGE_DELETED') {
+    const analyzedIntact =
+      analyzedIdx >= 0 &&
+      (!record.sourceRevision || sameSourceRevision(record.sourceRevision, sources[analyzedIdx])) &&
+      totalRead >= record.state.analyzedMessageCount
+    if (analyzedIntact) return
+    cancelRuntime(rt)
+    await markStale(rt, 'Chat history changed (edit, delete, or swipe). Use Rebuild to re-simulate from the current transcript.', eventOrigin(payload))
+    return
+  }
+
+  if (analyzedIdx >= 0) {
+    if (record.sourceRevision && !sameSourceRevision(record.sourceRevision, sources[analyzedIdx])) {
+      cancelRuntime(rt)
+      await markStale(rt, 'Chat history changed (edit, delete, or swipe). Use Rebuild to re-simulate from the current transcript.', eventOrigin(payload))
+      return
+    }
+    // Metadata-only update or background swipe on the analyzed message without changing active text/swipe
+    if (msgId && msgId === analyzedId) return
+    // Edit/update on a newer message after the last analyzed turn (e.g. normal reply finalization)
+    const eventIdx = msgId ? sources.findIndex((s) => s.id === msgId) : -1
+    if (eventIdx > analyzedIdx) return
+    // If a normal generation is actively running and payload omitted messageId, ignore until GENERATION_ENDED
+    if (!msgId && rt.generation && (rt.generation.start.generationType === undefined || rt.generation.start.generationType === 'normal')) return
+  } else if (msgId && sources.some((s) => s.id === msgId)) {
+    // Analyzed message is older than the recent tail, while the edited message is in the recent tail (newer)
+    return
+  }
+
+  cancelRuntime(rt)
+  await markStale(rt, 'Chat history changed (edit, delete, or swipe). Use Rebuild to re-simulate from the current transcript.', eventOrigin(payload))
+}
+
 for (const ev of ['MESSAGE_EDITED', 'MESSAGE_DELETED', 'MESSAGE_SWIPED', 'SWIPE_EDITED'] as const) {
   spindle.on(ev, (payload, userId) => {
     const rt = eventRuntime(payload, userId)
     if (!rt) return
-    cancelRuntime(rt)
-    void enqueue(rt, () =>
-      markStale(rt, 'Chat history changed (edit, delete, or swipe). Use Rebuild to re-simulate from the current transcript.', eventOrigin(payload)),
-    )
+    void enqueue(rt, () => reconcileHistoryEvent(rt, ev, payload))
   })
 }
 
