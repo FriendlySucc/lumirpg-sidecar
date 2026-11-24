@@ -104,7 +104,7 @@ function compactHistory(text: string): string {
   if (depth !== 0) return text
   return text.replace(/<internal_states>(?:(?!<\/?internal_states\b)[\s\S])*<\/internal_states>/g, block => {
     const inner = block.slice('<internal_states>'.length, -'</internal_states>'.length)
-    const pattern = /<state:([A-Za-z_]+)>(?:(?!<\/?state:|<!--|<\/?(?:p|audio|video|img|div|span|details|ledger|script|style|table|section|article|figure|iframe|svg)\b)[\s\S])*<\/state:\1>/g
+    const pattern = /<state:([A-Za-z_]+)>(?:(?!<\/?state:|<!--|<\/?(?:p|video|img|div|span|details|ledger|script|style|table|section|article|figure|iframe|svg)\b|<audio\s)[\s\S])*<\/state:\1>/g
     const sections = [...inner.matchAll(pattern)]
     if (!sections.length || sections.some(match => !SECTIONS.includes(match[1]))) return block
     let cursor = 0

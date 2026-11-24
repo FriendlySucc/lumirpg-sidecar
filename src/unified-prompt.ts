@@ -11,6 +11,7 @@ export function buildUnifiedPrompt(
   map: AtlasState,
   state: InternalState,
   playerName?: string | null,
+  backgroundContext?: string | null,
 ): string {
   const transcript = messages
     .map((m, i) => {
@@ -32,6 +33,10 @@ export function buildUnifiedPrompt(
   }).length
   const stateInitNote = populatedSections <= 2
     ? 'INITIALIZATION PASS: Most state sections are empty. Seed EVERY section supported by the story and backstory — including inv (gear/currency/status), dam & pair (established party/allies/rivals), reputation (group standing), tracks, arc, chekhov, leads, and offscreen_agendas whenever the transcript establishes them.\n'
+    : ''
+  const cleanBg = typeof backgroundContext === 'string' && backgroundContext.trim() ? backgroundContext.trim() : null
+  const bgSection = cleanBg
+    ? `\n\nCharacter card, persona & world lore (reference only — use to seed established backstory, relationships, inventory, factions, and world/region geography; do not leak hidden spoilers to the player):\n${cleanBg}`
     : ''
   return `Update the state and map from this story using ONE JSON object: {"statePatch": {}, "mapPatch": {}}.
 ${playerLine}${stateInitNote}Only include changes. DO NOT remove records, fields, prior memories, relationships or tiles merely because absent from the latest message. Never fabricate player knowledge, NPC private knowledge, ledger awakenings, rewards, or hidden locations. Keep distinguishable characters separate. Preserve established location coordinates, reciprocal connections, temporal pacing, current story continuity and exact entity identities. Draft suggested new map features only as such, not established narrative facts.
@@ -73,7 +78,7 @@ Current saved state (reference only):
 ${renderStateForPrompt(state) || '(no existing state)'}
 
 Current saved maps (reference only):
-${JSON.stringify(map.maps)}
+${JSON.stringify(map.maps)}${bgSection}
 
 Recent story:
 ${transcript}`

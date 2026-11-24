@@ -299,6 +299,16 @@ describe('prompt offload', () => {
     expect(injected.content).toContain('&lt;loc&gt;Market&lt;/loc&gt;')
   })
 
+  test('accepts <audio> field inside <state:world> when offloading and returns breakdown attribution', () => {
+    const worldWithAudio = '<internal_states><state:world><loc>Square</loc><audio>Evening bells and footsteps</audio></state:world></internal_states>'
+    const messages: LlmMessageDTO[] = [{ role: 'user', content: 'Kris listens to the square.' }]
+    const result = offloadPrompt(messages, worldWithAudio)
+    expect(result.compatible).toBe(true)
+    expect(result.reason).toBe('offloaded')
+    expect(result.breakdown).toEqual([{ messageIndex: 1, name: 'LumiAtlas stored state context' }])
+    expect(result.messages[1].content).toContain('&lt;audio&gt;Evening bells and footsteps&lt;/audio&gt;')
+  })
+
   test('without a canonical state it fails closed without changing the prompt', async () => {
     const messages: LlmMessageDTO[] = [{ role: 'user', content: 'A synthetic scene.' }]
     const result = offloadPrompt(messages, '')

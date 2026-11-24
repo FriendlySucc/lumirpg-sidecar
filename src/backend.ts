@@ -7,7 +7,7 @@ import { migrateLastInternalState, applyStateDelta, type InternalState } from '.
 import { applyMapDelta } from './map-delta.js'
 import { assessGeneration, sameSourceRevision, type GenerationStart, type SourceRevision } from './generation-policy.js'
 import { buildUnifiedPrompt, extractUnifiedDelta, UNIFIED_SYSTEM_PROMPT } from './unified-prompt.js'
-import { prepareSimulationContext } from './context-bridge.js'
+import { prepareSimulationInterceptorResult } from './context-bridge.js'
 import type { PromptMessage } from './prompt.js'
 import type {
   AtlasState,
@@ -310,6 +310,103 @@ async function readRecentMessages(chatId: string): Promise<{
   return { messages, originalMessages, latestSource, latestMessageId, playerName, totalRead: visible.length }
 }
 
+/** Read character card, active persona, and attached lorebook context when permissions are granted. */
+async function readStoryBackground(
+  chatId: string,
+  userId: string,
+  characterId?: string,
+): Promise<{ context: string; personaName: string | null }> {
+  const parts: string[] = []
+  let personaName: string | null = null
+  const clip = (raw: unknown, max: number): string =>
+    typeof raw === 'string' ? raw.trim().slice(0, max) : ''
+
+  let charWorldBookIds: string[] = []
+  if (characterId && spindle.permissions.has('characters') && typeof spindle.characters?.get === 'function') {
+    try {
+      const char = await spindle.characters.get(characterId, userId)
+      if (char) {
+        const charLines: string[] = []
+        if (char.name) charLines.push(`Name: ${char.name}`)
+        const desc = clip(char.description, 4500)
+        if (desc) charLines.push(`Description:\n${desc}`)
+        const pers = clip(char.personality, 1500)
+        if (pers) charLines.push(`Personality:\n${pers}`)
+        const scen = clip(char.scenario, 2500)
+        if (scen) charLines.push(`Scenario:\n${scen}`)
+        if (charLines.length) parts.push(`[CHARACTER CARD]\n${charLines.join('\n')}`)
+        if (Array.isArray(char.world_book_ids)) charWorldBookIds = char.world_book_ids.filter((id): id is string => typeof id === 'string' && Boolean(id))
+      }
+    } catch (err) {
+      spindle.log.warn(`LumiAtlas: could not read character card: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  if (spindle.permissions.has('personas') && typeof spindle.personas?.getActive === 'function') {
+    try {
+      const persona = (await spindle.personas.getActive(userId)) ?? (typeof spindle.personas.getDefault === 'function' ? await spindle.personas.getDefault(userId) : null)
+      if (persona) {
+        if (typeof persona.name === 'string' && persona.name.trim()) personaName = persona.name.trim()
+        const pLines: string[] = []
+        if (personaName) pLines.push(`Name: ${personaName}`)
+        const title = clip(persona.title, 200)
+        if (title) pLines.push(`Title: ${title}`)
+        const desc = clip(persona.description, 2500)
+        if (desc) pLines.push(`Description:\n${desc}`)
+        if (pLines.length) parts.push(`[PLAYER PERSONA]\n${pLines.join('\n')}`)
+      }
+    } catch (err) {
+      spindle.log.warn(`LumiAtlas: could not read active persona: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  if (spindle.permissions.has('world_books') && spindle.world_books) {
+    try {
+      const loreLines: string[] = []
+      let budget = 6000
+      const seenEntryIds = new Set<string>()
+      if (typeof spindle.world_books.getActivated === 'function' && typeof spindle.world_books.entries?.get === 'function') {
+        const activated = await spindle.world_books.getActivated(chatId, userId)
+        for (const item of Array.isArray(activated) ? activated.slice(0, 12) : []) {
+          if (!item?.id || seenEntryIds.has(item.id) || budget <= 200) continue
+          seenEntryIds.add(item.id)
+          const entry = await spindle.world_books.entries.get(item.id, userId)
+          const body = clip(entry?.content, Math.min(1200, budget))
+          if (!body) continue
+          const label = clip(entry?.comment || item.comment || item.keys?.join(', '), 80) || 'Lore'
+          loreLines.push(`- ${label}: ${body}`)
+          budget -= body.length + label.length + 6
+        }
+      }
+      if (budget > 600 && charWorldBookIds.length && typeof spindle.world_books.entries?.list === 'function') {
+        for (const bookId of charWorldBookIds.slice(0, 2)) {
+          if (budget <= 400) break
+          const listed = await spindle.world_books.entries.list(bookId, { limit: 25, userId })
+          const entries = Array.isArray(listed?.data) ? listed.data : []
+          const prioritized = [
+            ...entries.filter((e) => e && !e.disabled && e.constant),
+            ...entries.filter((e) => e && !e.disabled && !e.constant),
+          ]
+          for (const entry of prioritized) {
+            if (!entry?.id || seenEntryIds.has(entry.id) || budget <= 200) continue
+            seenEntryIds.add(entry.id)
+            const body = clip(entry.content, Math.min(1000, budget))
+            if (!body) continue
+            const label = clip(entry.comment || (Array.isArray(entry.key) ? entry.key.join(', ') : ''), 80) || 'Lore'
+            loreLines.push(`- ${label}: ${body}`)
+            budget -= body.length + label.length + 6
+          }
+        }
+      }
+      if (loreLines.length) parts.push(`[WORLD LORE]\n${loreLines.join('\n')}`)
+    } catch (err) {
+      spindle.log.warn(`LumiAtlas: could not read world books: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  return { context: parts.join('\n\n').slice(0, 14000), personaName }
+}
+
 function archiveLayerIfChanged(record: StoredChatRecord, nextState: AtlasState): Record<Scale, MapLayer[]> {
   const archives: Record<Scale, MapLayer[]> = {
     local: [...record.archives.local],
@@ -424,8 +521,13 @@ async function runAnalysis(
       return
     }
 
-    if (!await spindle.chats.get(rt.chatId, rt.userId)) throw new Error('Chat is unavailable for this user.')
-    const { messages, originalMessages, latestSource, latestMessageId, playerName, totalRead } = await readRecentMessages(rt.chatId)
+    const chatMeta = await spindle.chats.get(rt.chatId, rt.userId)
+    if (!chatMeta) throw new Error('Chat is unavailable for this user.')
+    const [{ messages, originalMessages, latestSource, latestMessageId, playerName, totalRead }, background] = await Promise.all([
+      readRecentMessages(rt.chatId),
+      readStoryBackground(rt.chatId, rt.userId, typeof chatMeta.character_id === 'string' ? chatMeta.character_id : undefined),
+    ])
+    const effectivePlayerName = background.personaName || playerName
     if (!messages.length || !latestSource || latestSource.role !== 'assistant') {
       emitStatus(rt.userId, rt.chatId, 'error', 'No current assistant reply to simulate yet.', record.state, effectiveConfig, origin, record.archives, record.internalState)
       return
@@ -483,7 +585,7 @@ async function runAnalysis(
       record.archives,
     )
 
-    const userPrompt = buildUnifiedPrompt(messages, baseMap, seedState, playerName)
+    const userPrompt = buildUnifiedPrompt(messages, baseMap, seedState, effectivePlayerName, background.context)
     const effectiveModel = chosen.model.trim()
     const genParams: Record<string, unknown> = { temperature: 0.2, max_tokens: 8192 }
     if (effectiveModel) genParams.model = effectiveModel
@@ -705,7 +807,12 @@ function registerSimulationInterceptor(): void {
       const rt = getRuntime(context.userId, context.chatId)
       const record = await loadChatRecord(rt)
       if (!record.config.enabled || record.state.stale || !record.internalState) return messages
-      return prepareSimulationContext(messages, record.internalState)
+      const prepared = prepareSimulationInterceptorResult(messages, record.internalState)
+      if (!prepared.compatible) {
+        spindle.log.warn(`LumiAtlas interceptor skipped chat ${context.chatId}: ${prepared.reason}`)
+        return messages
+      }
+      return prepared.output
     } catch (err) {
       spindle.log.warn(`LumiAtlas context unavailable: ${err instanceof Error ? err.message : String(err)}`)
       return messages
