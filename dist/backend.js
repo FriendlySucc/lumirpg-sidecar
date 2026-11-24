@@ -962,11 +962,14 @@ function appendMemories(section, proposed) {
   }
   return section;
 }
-function pathTag(value) {
-  if (typeof value !== "string" || !new RegExp(`^${XML_NAME}$`).test(value) || value.startsWith("state:"))
-    throw new Error("Invalid path tag");
+function pathTag(value, sectionName) {
+  if (typeof value !== "string" || !new RegExp(`^${XML_NAME}$`).test(value) || value.startsWith("state:")) {
+    const where = sectionName ? ` in ${sectionName}` : "";
+    throw new Error(`Invalid path tag "${String(value)}"${where}`);
+  }
   return value;
 }
+var TEXT_SELECTOR_TAGS = new Set(["#text", "text()", "."]);
 var SECTION_CONTAINERS = {
   leads: ["active_leads", "usable", "resolved_leads"],
   chekhov: ["chamber", "locked", "fired"]
@@ -979,21 +982,34 @@ function resolvePath(xml, root, path, sectionName) {
   if (!Array.isArray(path))
     throw new Error(`Invalid operation path in ${sectionName}`);
   let current = root;
-  for (const step of path) {
+  const steps = path.length > 0 && path[0] === `state:${sectionName}` ? path.slice(1) : path;
+  for (const step of steps) {
     let tag;
     let where;
     if (typeof step === "string")
-      tag = pathTag(step);
+      tag = pathTag(step, sectionName);
     else {
       const selector = plainObject(step, "path selector");
       onlyKeys(selector, ["tag", "where"], "path selector");
-      tag = pathTag(selector.tag);
+      tag = pathTag(selector.tag, sectionName);
       if (Object.hasOwn(selector, "where")) {
-        where = plainObject(selector.where, "path identity");
-        onlyKeys(where, ["tag", "value"], "path identity");
-        pathTag(where.tag);
-        if (typeof where.value !== "string")
-          throw new Error("Invalid path identity");
+        const rawWhere = plainObject(selector.where, "path identity");
+        if (Object.hasOwn(rawWhere, "text") && !Object.hasOwn(rawWhere, "tag") && !Object.hasOwn(rawWhere, "value")) {
+          onlyKeys(rawWhere, ["text"], "path identity");
+          if (typeof rawWhere.text !== "string")
+            throw new Error("Invalid path identity");
+          where = { mode: "text", value: rawWhere.text };
+        } else {
+          onlyKeys(rawWhere, ["tag", "value"], "path identity");
+          if (typeof rawWhere.value !== "string")
+            throw new Error("Invalid path identity");
+          if (typeof rawWhere.tag === "string" && TEXT_SELECTOR_TAGS.has(rawWhere.tag)) {
+            where = { mode: "text", value: rawWhere.value };
+          } else {
+            const whereTag = pathTag(rawWhere.tag, sectionName);
+            where = { mode: "child", tag: whereTag, value: rawWhere.value };
+          }
+        }
       }
     }
     const candidates = current.children.filter((child) => {
@@ -1001,13 +1017,21 @@ function resolvePath(xml, root, path, sectionName) {
         return false;
       if (!where)
         return true;
+      if (where.mode === "text") {
+        if (child.children.length)
+          return false;
+        return nodeText(xml, child) === where.value;
+      }
       const ids = child.children.filter((id) => id.name === where.tag);
+      if (ids.length === 0 && where.tag === "text" && child.children.length === 0) {
+        return nodeText(xml, child) === where.value;
+      }
       if (ids.length !== 1)
         throw new Error("Invalid path identity");
       return nodeText(xml, ids[0]) === where.value;
     });
     if (candidates.length !== 1) {
-      const label = where ? `${tag}[${String(where.tag)}=${String(where.value)}]` : tag;
+      const label = where ? where.mode === "text" ? `${tag}[text=${where.value}]` : `${tag}[${where.tag}=${where.value}]` : tag;
       const kind = candidates.length === 0 ? "Missing" : `Ambiguous (${candidates.length} matches)`;
       throw new Error(`${kind} operation path in ${sectionName}: ${label}`);
     }
@@ -1335,7 +1359,7 @@ All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and
   leads: <active_leads><lead>..</lead></active_leads><usable><lead>..</lead></usable>
   notebook: <ent>..</ent>
 Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
-For non-empty existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) ALWAYS use precise operations: {"ops":[{"op":"set","path":[{"tag":"ent_rep","where":{"tag":"name","value":"exact name"}},"standing"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":[],"xml":"<ent>new text</ent>"}]} to append directly inside <state:name>. Use "path":[] for locations, reputation, tracks, and notebook (do NOT invent a wrapper tag); use "path":["active_leads"] / ["usable"] / ["resolved_leads"] for leads and "path":["chamber"] / ["locked"] / ["fired"] for chekhov. Paths must identify existing nodes unambiguously. NEVER send a raw XML string for a non-empty existing section. Only for missing or currently empty sections (e.g. <state:leads></state:leads>) may a full well-formed <state:name>...</state:name> XML string be provided.
+For non-empty existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) ALWAYS use precise operations: {"ops":[{"op":"set","path":[{"tag":"ent_rep","where":{"tag":"name","value":"exact name"}},"standing"],"value":"new text"}]} to set a scalar, {"ops":[{"op":"set","path":[{"tag":"track","where":{"text":"exact current text"}}],"value":"updated text"}]} to update a direct-text item (<track>, <lead>, <bullet>, <ent>), or {"ops":[{"op":"append","path":[],"xml":"<ent>new text</ent>"}]} to append directly inside <state:name>. Never include "state:..." in path. Use "path":[] for locations, reputation, tracks, and notebook (do NOT invent a wrapper tag); use "path":["active_leads"] / ["usable"] / ["resolved_leads"] for leads and "path":["chamber"] / ["locked"] / ["fired"] for chekhov. Paths must identify existing nodes unambiguously. NEVER send a raw XML string for a non-empty existing section. Only for missing or currently empty sections (e.g. <state:leads></state:leads>) may a full well-formed <state:name>...</state:name> XML string be provided.
 
 For location map updates, put only changed maps under mapPatch local/region/world. ${mapInitNote}Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. Do not replace or omit existing tiles/roads.
 Map geometry rules (REQUIRED for readable maps):

@@ -426,10 +426,15 @@ function appendMemories(section: string, proposed: unknown): string {
   return section
 }
 
-function pathTag(value: unknown): string {
-  if (typeof value !== 'string' || !new RegExp(`^${XML_NAME}$`).test(value) || value.startsWith('state:')) throw new Error('Invalid path tag')
+function pathTag(value: unknown, sectionName?: string): string {
+  if (typeof value !== 'string' || !new RegExp(`^${XML_NAME}$`).test(value) || value.startsWith('state:')) {
+    const where = sectionName ? ` in ${sectionName}` : ''
+    throw new Error(`Invalid path tag "${String(value)}"${where}`)
+  }
   return value
 }
+
+const TEXT_SELECTOR_TAGS = new Set(['#text', 'text()', '.'])
 
 const SECTION_CONTAINERS: Record<string, readonly string[]> = {
   leads: ['active_leads', 'usable', 'resolved_leads'],
@@ -444,30 +449,53 @@ const SECTION_SCALAR_CHILDREN: Record<string, readonly string[]> = {
 function resolvePath(xml: string, root: XmlNode, path: unknown, sectionName: string): XmlNode {
   if (!Array.isArray(path)) throw new Error(`Invalid operation path in ${sectionName}`)
   let current = root
-  for (const step of path) {
+  const steps = path.length > 0 && path[0] === `state:${sectionName}` ? path.slice(1) : path
+  for (const step of steps) {
     let tag: string
-    let where: Record<string, unknown> | undefined
-    if (typeof step === 'string') tag = pathTag(step)
+    let where: { mode: 'child'; tag: string; value: string } | { mode: 'text'; value: string } | undefined
+    if (typeof step === 'string') tag = pathTag(step, sectionName)
     else {
       const selector = plainObject(step, 'path selector')
       onlyKeys(selector, ['tag', 'where'], 'path selector')
-      tag = pathTag(selector.tag)
+      tag = pathTag(selector.tag, sectionName)
       if (Object.hasOwn(selector, 'where')) {
-        where = plainObject(selector.where, 'path identity')
-        onlyKeys(where, ['tag', 'value'], 'path identity')
-        pathTag(where.tag)
-        if (typeof where.value !== 'string') throw new Error('Invalid path identity')
+        const rawWhere = plainObject(selector.where, 'path identity')
+        if (Object.hasOwn(rawWhere, 'text') && !Object.hasOwn(rawWhere, 'tag') && !Object.hasOwn(rawWhere, 'value')) {
+          onlyKeys(rawWhere, ['text'], 'path identity')
+          if (typeof rawWhere.text !== 'string') throw new Error('Invalid path identity')
+          where = { mode: 'text', value: rawWhere.text }
+        } else {
+          onlyKeys(rawWhere, ['tag', 'value'], 'path identity')
+          if (typeof rawWhere.value !== 'string') throw new Error('Invalid path identity')
+          if (typeof rawWhere.tag === 'string' && TEXT_SELECTOR_TAGS.has(rawWhere.tag)) {
+            where = { mode: 'text', value: rawWhere.value }
+          } else {
+            const whereTag = pathTag(rawWhere.tag, sectionName)
+            where = { mode: 'child', tag: whereTag, value: rawWhere.value }
+          }
+        }
       }
     }
     const candidates = current.children.filter(child => {
       if (child.name !== tag) return false
       if (!where) return true
-      const ids = child.children.filter(id => id.name === where!.tag)
+      if (where.mode === 'text') {
+        if (child.children.length) return false
+        return nodeText(xml, child) === where.value
+      }
+      const ids = child.children.filter(id => id.name === where.tag)
+      if (ids.length === 0 && where.tag === 'text' && child.children.length === 0) {
+        return nodeText(xml, child) === where.value
+      }
       if (ids.length !== 1) throw new Error('Invalid path identity')
       return nodeText(xml, ids[0]) === where.value
     })
     if (candidates.length !== 1) {
-      const label = where ? `${tag}[${String(where.tag)}=${String(where.value)}]` : tag
+      const label = where
+        ? where.mode === 'text'
+          ? `${tag}[text=${where.value}]`
+          : `${tag}[${where.tag}=${where.value}]`
+        : tag
       const kind = candidates.length === 0 ? 'Missing' : `Ambiguous (${candidates.length} matches)`
       throw new Error(`${kind} operation path in ${sectionName}: ${label}`)
     }

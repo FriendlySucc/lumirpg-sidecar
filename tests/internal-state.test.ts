@@ -300,6 +300,24 @@ test('generic ops match the background analyzer contract', () => {
   expect(extended.sections.leads).toContain('<usable><lead>Guild debt</lead></usable>')
   expect(extended.sections.chekhov).toContain('<locked><bullet>Broken seal</bullet></locked>')
   expect(extended.sections.arc).toContain('<sho>Escape from the ruins</sho>')
+
+  // Direct-text selectors (#text, text(), ., { text }) and redundant leading state:<section> step work safely
+  const textTracks = {
+    sections: {
+      tracks: '<state:tracks><main>Survive</main><track>Guild Debt | open | 10g</track><track>Exile | open | fresh</track></state:tracks>',
+    },
+  }
+  const t1 = applyStateDelta(textTracks, {
+    tracks: {
+      ops: [
+        { op: 'set', path: [{ tag: 'track', where: { tag: '#text', value: 'Guild Debt | open | 10g' } }], value: 'Guild Debt | paid | 0g' },
+        { op: 'set', path: ['state:tracks', { tag: 'track', where: { text: 'Exile | open | fresh' } }], value: 'Exile | active | moving on' },
+      ],
+    },
+  })
+  expect(t1.sections.tracks).toContain('<track>Guild Debt | paid | 0g</track>')
+  expect(t1.sections.tracks).toContain('<track>Exile | active | moving on</track>')
+  expect(() => applyStateDelta(textTracks, { tracks: { ops: [{ op: 'set', path: ['state:world', 'main'], value: 'nope' }] } })).toThrow(/state:world/)
 })
 
 test('generic append cannot add duplicate identified records', () => {
