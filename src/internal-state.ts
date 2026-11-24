@@ -504,6 +504,14 @@ function sectionRoot(section: string, name: string): XmlNode {
   return root
 }
 
+function isEmptySection(section: string, name: string): boolean {
+  const root = sectionRoot(section, name)
+  if (root.children.length > 0) return false
+  if (root.selfClosing) return true
+  const inner = section.slice(root.openEnd, root.closeStart).replace(/\u2800+/g, ' ').trim()
+  return !inner || inner === '∅' || inner === 'Ø' || inner === '—' || inner === '-'
+}
+
 /** Apply updates transactionally. Reject malformed operations rather than ignoring them. */
 export function applyStateDelta(current: InternalState, delta: Record<string, unknown>): InternalState {
   const state = plainObject(current, 'state')
@@ -526,7 +534,9 @@ export function applyStateDelta(current: InternalState, delta: Record<string, un
     if (!VALID_SECTION.has(name)) throw new Error('Invalid state section')
     if (typeof value === 'string') {
       sectionRoot(value, name)
-      if (Object.hasOwn(sections, name) && sections[name] !== value) throw new Error(`Use bounded edits for existing ${name} section`)
+      if (Object.hasOwn(sections, name) && sections[name] !== value && !isEmptySection(sections[name], name)) {
+        throw new Error(`Use bounded edits for existing ${name} section`)
+      }
       sections[name] = value
       continue
     }

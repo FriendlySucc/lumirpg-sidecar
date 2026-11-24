@@ -186,6 +186,14 @@ test('full-section replacement cannot silently drop existing records or fields',
   expect(() => applyStateDelta(current, { offscreen_agendas: '<state:offscreen_agendas><ent_off><name>A</name><agenda>Changed</agenda></ent_off></state:offscreen_agendas>' })).toThrow()
   const first = applyStateDelta({ sections: {} }, { offscreen_agendas: '<state:offscreen_agendas><ent_off><name>A</name></ent_off></state:offscreen_agendas>' })
   expect(first.sections.offscreen_agendas).toContain('<name>A</name>')
+  // Blank/empty sections bootstrapped on a fresh chat can be initialized with a full XML string
+  const blank = { sections: { leads: '<state:leads></state:leads>', onscreen: '<state:onscreen>∅</state:onscreen>' } }
+  const initialized = applyStateDelta(blank, {
+    leads: '<state:leads><active_leads><lead>Check the border quarry</lead></active_leads></state:leads>',
+    onscreen: '<state:onscreen><ent_on><name>Elena</name></ent_on></state:onscreen>',
+  })
+  expect(initialized.sections.leads).toContain('Check the border quarry')
+  expect(initialized.sections.onscreen).toContain('Elena')
 })
 
 test('record patches update one named character without deleting another or other fields', () => {

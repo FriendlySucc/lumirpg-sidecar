@@ -946,6 +946,15 @@ function sectionRoot(section, name) {
     throw new Error(`Invalid ${name} section`);
   return root;
 }
+function isEmptySection(section, name) {
+  const root = sectionRoot(section, name);
+  if (root.children.length > 0)
+    return false;
+  if (root.selfClosing)
+    return true;
+  const inner = section.slice(root.openEnd, root.closeStart).replace(/\u2800+/g, " ").trim();
+  return !inner || inner === "\u2205" || inner === "\xD8" || inner === "\u2014" || inner === "-";
+}
 function applyStateDelta(current, delta) {
   const state = plainObject(current, "state");
   onlyKeys(state, ["sections", "ledger", "envelope"], "state");
@@ -972,8 +981,9 @@ function applyStateDelta(current, delta) {
       throw new Error("Invalid state section");
     if (typeof value === "string") {
       sectionRoot(value, name);
-      if (Object.hasOwn(sections, name) && sections[name] !== value)
+      if (Object.hasOwn(sections, name) && sections[name] !== value && !isEmptySection(sections[name], name)) {
         throw new Error(`Use bounded edits for existing ${name} section`);
+      }
       sections[name] = value;
       continue;
     }
@@ -1140,7 +1150,7 @@ All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and
   pair (identity N1\u2194N2): mode, dam, matrix, wall
 - Memory section (append-only): entityMem uses {"append":[{"name":"exact character","entries":["fact | T:... | V:... | C:..."]}]}.
 Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
-For other existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) use precise operations: {"ops":[{"op":"set","path":["container",{"tag":"record","where":{"tag":"name","value":"exact name"}},"field"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":["container"],"xml":"<entry>new text</entry>"}]} to append an XML element. Paths must identify existing nodes unambiguously. Never replace a whole section with a partial copy. For new sections, a full well-formed <state:name> XML string may be provided.
+For non-empty existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) ALWAYS use precise operations: {"ops":[{"op":"set","path":["container",{"tag":"record","where":{"tag":"name","value":"exact name"}},"field"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":["container"],"xml":"<entry>new text</entry>"}]} to append an XML element (use "path":[] to append directly inside <state:name>). Paths must identify existing nodes unambiguously. NEVER send a raw XML string for a non-empty existing section. Only for missing or currently empty sections (e.g. <state:leads></state:leads>) may a full well-formed <state:name>...</state:name> XML string be provided.
 
 For location map updates, put only changed maps under mapPatch local/region/world. Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. New tiles need id, name, x, y, w, h, and a new map needs id, name, tiles. Do not replace or omit existing tiles/roads. Use map initialization for newly entered places: 6\u201310 useful connected local locations, region/world tiles, roads, sensible dimensions, and known character pins at region/world scales. Unknown or hidden details must not be disclosed as fact.
 
