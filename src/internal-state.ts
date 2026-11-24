@@ -264,14 +264,16 @@ function insertInto(xml: string, node: XmlNode, content: string): string {
   return xml.slice(0, node.closeStart) + content + xml.slice(node.closeStart)
 }
 
-function setDirectFields(xml: string, parent: XmlNode, fields: Record<string, unknown>, allowed: readonly string[]): string {
+function setDirectFields(xml: string, parent: XmlNode, fields: Record<string, unknown>, allowed: readonly string[], context: string): string {
   const edits: { start: number; end: number; text: string }[] = []
   let append = ''
   for (const [field, raw] of Object.entries(fields)) {
-    if (!allowed.includes(field) || typeof raw !== 'string') throw new Error('Invalid record field')
+    if (!allowed.includes(field)) throw new Error(`Invalid record field "${field}" in ${context} (allowed: ${allowed.join(', ')})`)
+    const text = typeof raw === 'string' ? raw : typeof raw === 'number' && Number.isFinite(raw) ? String(raw) : null
+    if (text === null) throw new Error(`Invalid record field "${field}" in ${context}: expected string`)
     const matches = parent.children.filter(child => child.name === field)
     if (matches.length > 1) throw new Error('Ambiguous record field')
-    const replacement = `<${field}>${escapeText(raw)}</${field}>`
+    const replacement = `<${field}>${escapeText(text)}</${field}>`
     if (!matches.length) append += replacement
     else {
       const match = matches[0]
@@ -298,7 +300,12 @@ function updateRecordSection(section: string, sectionName: string, records: unkn
     const row = plainObject(entry, 'record')
     onlyKeys(row, ['name', 'fields'], 'record')
     if (typeof row.name !== 'string' || !row.name.trim()) throw new Error('Invalid record identity')
-    const fields = plainObject(row.fields, 'record fields')
+    const rawFields = plainObject(row.fields, 'record fields')
+    const fields: Record<string, unknown> = {}
+    for (const [key, val] of Object.entries(rawFields)) {
+      if (key === spec.identity && val === row.name) continue
+      fields[key] = val
+    }
     const root = sectionRoot(section, sectionName)
     const candidates = root.children.filter(child => {
       if (child.name !== spec.tag) return false
@@ -311,8 +318,8 @@ function updateRecordSection(section: string, sectionName: string, records: unkn
       const record = `<${spec.tag}><${spec.identity}>${escapeText(row.name)}</${spec.identity}></${spec.tag}>`
       section = insertInto(section, root, record)
       const newRoot = sectionRoot(section, sectionName)
-      section = setDirectFields(section, newRoot.children[newRoot.children.length - 1], fields, spec.fields)
-    } else section = setDirectFields(section, candidates[0], fields, spec.fields)
+      section = setDirectFields(section, newRoot.children[newRoot.children.length - 1], fields, spec.fields, sectionName)
+    } else section = setDirectFields(section, candidates[0], fields, spec.fields, sectionName)
     sectionRoot(section, sectionName)
   }
   return section
@@ -549,7 +556,7 @@ export function applyStateDelta(current: InternalState, delta: Record<string, un
     if (keys[0] !== 'fields' || !SCALAR_FIELDS[name]) throw new Error(`Invalid ${name} patch`)
     const fields = plainObject(operation.fields, `${name} fields`)
     const section = sections[name] || `<state:${name}></state:${name}>`
-    const result = setDirectFields(section, sectionRoot(section, name), fields, SCALAR_FIELDS[name])
+    const result = setDirectFields(section, sectionRoot(section, name), fields, SCALAR_FIELDS[name], name)
     sectionRoot(result, name)
     if (Object.hasOwn(sections, name) || result !== section) sections[name] = result
   }

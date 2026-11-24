@@ -340,8 +340,13 @@ test('delta validation is atomic and rejects extra operations, malformed XML and
 })
 
 test('field patch escapes arbitrary text and rejects unrecognized fields', () => {
-  const current = migrateLastInternalState([{role:'assistant', content:'<internal_states><state:world><time>morning</time><weather>rain</weather></state:world></internal_states>'}])
-  const updated = applyStateDelta(current, { world: { fields: { weather: 'Rain & wind <strong>' } } })
+  const current = migrateLastInternalState([{role:'assistant', content:'<internal_states><state:world><ct>1</ct><time>morning</time><weather>rain</weather></state:world></internal_states>'}])
+  const updated = applyStateDelta(current, { world: { fields: { ct: 2, weather: 'Rain & wind <strong>' } } })
+  expect(updated.sections.world).toContain('<ct>2</ct>')
   expect(updated.sections.world).toContain('Rain &amp; wind &lt;strong&gt;')
-  expect(() => applyStateDelta(current, { world: { fields: { arbitrary: 'bad' } } })).toThrow()
+  expect(() => applyStateDelta(current, { world: { fields: { arbitrary: 'bad' } } })).toThrow(/arbitrary/)
+  const offscreen = { sections: { offscreen_agendas: '<state:offscreen_agendas><ent_off><name>Fox</name><loc>Harbor</loc></ent_off></state:offscreen_agendas>' } }
+  const echoed = applyStateDelta(offscreen, { offscreen_agendas: { records: [{ name: 'Fox', fields: { name: 'Fox', loc: 'Market' } }] } })
+  expect(echoed.sections.offscreen_agendas).toContain('<loc>Market</loc>')
+  expect(() => applyStateDelta(offscreen, { offscreen_agendas: { records: [{ name: 'Fox', fields: { name: 'Other', loc: 'Market' } }] } })).toThrow(/name/)
 })

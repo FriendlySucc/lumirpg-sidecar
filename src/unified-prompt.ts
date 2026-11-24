@@ -12,7 +12,21 @@ export function buildUnifiedPrompt(messages: PromptMessage[], map: AtlasState, s
 Only include changes. DO NOT remove records, fields, prior memories, relationships or tiles merely because absent from the latest message. Never fabricate player knowledge, NPC private knowledge, ledger awakenings, rewards, or hidden locations. Keep distinguishable characters separate. Preserve established location coordinates, reciprocal connections, temporal pacing, current story continuity and exact entity identities. Draft suggested new map features only as such, not established narrative facts.
 
 State sections in order: ${STATE_SECTIONS.join(', ')}.
-Use {"world":{"fields":{"time":"..."}}} for changed world fields. For onscreen, offscreen_agendas, entity_state, thoughts, dam, pair use {"records":[{"name":"existing exact identity","fields":{"loc":"..."}}]}; DAM identity is directional N1→N2 and pair identity N1↔N2. For entityMem use {"append":[{"name":"exact character","entries":["fact | T:... | V:... | C:..."]}]}. Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
+All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and only the exact field names below are allowed:
+- Scalar sections (use {"<section>":{"fields":{...}}}):
+  world: ct, loc, time, date, weather, room, user_pos, entries, obstacles, audio, pacing
+  inv: inv, titles, status
+  story_notes: threads, seeds, motives, horizon, GremlinNote, heckle
+  vent: vent
+- Record sections (use {"<section>":{"records":[{"name":"exact identity","fields":{...}}]}}; put identity ONLY in "name", never inside "fields"):
+  onscreen: parrott, residualMood, tfdy, salience, agenda, why, end, move
+  offscreen_agendas: loc, agenda, why, goal, end, mood, tfdy, salience
+  entity_state: fontColor, look, voice, persona, private
+  thoughts: tQ1, tQ2, tQ3, tQ4, tQ5
+  dam (identity N1→N2): sluice, filters, misc, intent
+  pair (identity N1↔N2): mode, dam, matrix, wall
+- Memory section (append-only): entityMem uses {"append":[{"name":"exact character","entries":["fact | T:... | V:... | C:..."]}]}.
+Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
 For other existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) use precise operations: {"ops":[{"op":"set","path":["container",{"tag":"record","where":{"tag":"name","value":"exact name"}},"field"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":["container"],"xml":"<entry>new text</entry>"}]} to append an XML element. Paths must identify existing nodes unambiguously. Never replace a whole section with a partial copy. For new sections, a full well-formed <state:name> XML string may be provided.
 
 For location map updates, put only changed maps under mapPatch local/region/world. Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. New tiles need id, name, x, y, w, h, and a new map needs id, name, tiles. Do not replace or omit existing tiles/roads. Use map initialization for newly entered places: 6–10 useful connected local locations, region/world tiles, roads, sensible dimensions, and known character pins at region/world scales. Unknown or hidden details must not be disclosed as fact.

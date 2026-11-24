@@ -653,16 +653,19 @@ function insertInto(xml, node, content) {
   }
   return xml.slice(0, node.closeStart) + content + xml.slice(node.closeStart);
 }
-function setDirectFields(xml, parent, fields, allowed) {
+function setDirectFields(xml, parent, fields, allowed, context) {
   const edits = [];
   let append = "";
   for (const [field, raw] of Object.entries(fields)) {
-    if (!allowed.includes(field) || typeof raw !== "string")
-      throw new Error("Invalid record field");
+    if (!allowed.includes(field))
+      throw new Error(`Invalid record field "${field}" in ${context} (allowed: ${allowed.join(", ")})`);
+    const text = typeof raw === "string" ? raw : typeof raw === "number" && Number.isFinite(raw) ? String(raw) : null;
+    if (text === null)
+      throw new Error(`Invalid record field "${field}" in ${context}: expected string`);
     const matches = parent.children.filter((child) => child.name === field);
     if (matches.length > 1)
       throw new Error("Ambiguous record field");
-    const replacement = `<${field}>${escapeText(raw)}</${field}>`;
+    const replacement = `<${field}>${escapeText(text)}</${field}>`;
     if (!matches.length)
       append += replacement;
     else {
@@ -695,7 +698,13 @@ function updateRecordSection(section, sectionName, records) {
     onlyKeys(row, ["name", "fields"], "record");
     if (typeof row.name !== "string" || !row.name.trim())
       throw new Error("Invalid record identity");
-    const fields = plainObject(row.fields, "record fields");
+    const rawFields = plainObject(row.fields, "record fields");
+    const fields = {};
+    for (const [key, val] of Object.entries(rawFields)) {
+      if (key === spec.identity && val === row.name)
+        continue;
+      fields[key] = val;
+    }
     const root = sectionRoot(section, sectionName);
     const candidates = root.children.filter((child) => {
       if (child.name !== spec.tag)
@@ -711,9 +720,9 @@ function updateRecordSection(section, sectionName, records) {
       const record = `<${spec.tag}><${spec.identity}>${escapeText(row.name)}</${spec.identity}></${spec.tag}>`;
       section = insertInto(section, root, record);
       const newRoot = sectionRoot(section, sectionName);
-      section = setDirectFields(section, newRoot.children[newRoot.children.length - 1], fields, spec.fields);
+      section = setDirectFields(section, newRoot.children[newRoot.children.length - 1], fields, spec.fields, sectionName);
     } else
-      section = setDirectFields(section, candidates[0], fields, spec.fields);
+      section = setDirectFields(section, candidates[0], fields, spec.fields, sectionName);
     sectionRoot(section, sectionName);
   }
   return section;
@@ -998,7 +1007,7 @@ function applyStateDelta(current, delta) {
       throw new Error(`Invalid ${name} patch`);
     const fields = plainObject(operation.fields, `${name} fields`);
     const section = sections[name] || `<state:${name}></state:${name}>`;
-    const result = setDirectFields(section, sectionRoot(section, name), fields, SCALAR_FIELDS[name]);
+    const result = setDirectFields(section, sectionRoot(section, name), fields, SCALAR_FIELDS[name], name);
     sectionRoot(result, name);
     if (Object.hasOwn(sections, name) || result !== section)
       sections[name] = result;
@@ -1116,7 +1125,21 @@ ${m.content.slice(0, 1e4)}`).join(`
 Only include changes. DO NOT remove records, fields, prior memories, relationships or tiles merely because absent from the latest message. Never fabricate player knowledge, NPC private knowledge, ledger awakenings, rewards, or hidden locations. Keep distinguishable characters separate. Preserve established location coordinates, reciprocal connections, temporal pacing, current story continuity and exact entity identities. Draft suggested new map features only as such, not established narrative facts.
 
 State sections in order: ${STATE_SECTIONS.join(", ")}.
-Use {"world":{"fields":{"time":"..."}}} for changed world fields. For onscreen, offscreen_agendas, entity_state, thoughts, dam, pair use {"records":[{"name":"existing exact identity","fields":{"loc":"..."}}]}; DAM identity is directional N1\u2192N2 and pair identity N1\u2194N2. For entityMem use {"append":[{"name":"exact character","entries":["fact | T:... | V:... | C:..."]}]}. Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
+All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and only the exact field names below are allowed:
+- Scalar sections (use {"<section>":{"fields":{...}}}):
+  world: ct, loc, time, date, weather, room, user_pos, entries, obstacles, audio, pacing
+  inv: inv, titles, status
+  story_notes: threads, seeds, motives, horizon, GremlinNote, heckle
+  vent: vent
+- Record sections (use {"<section>":{"records":[{"name":"exact identity","fields":{...}}]}}; put identity ONLY in "name", never inside "fields"):
+  onscreen: parrott, residualMood, tfdy, salience, agenda, why, end, move
+  offscreen_agendas: loc, agenda, why, goal, end, mood, tfdy, salience
+  entity_state: fontColor, look, voice, persona, private
+  thoughts: tQ1, tQ2, tQ3, tQ4, tQ5
+  dam (identity N1\u2192N2): sluice, filters, misc, intent
+  pair (identity N1\u2194N2): mode, dam, matrix, wall
+- Memory section (append-only): entityMem uses {"append":[{"name":"exact character","entries":["fact | T:... | V:... | C:..."]}]}.
+Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
 For other existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) use precise operations: {"ops":[{"op":"set","path":["container",{"tag":"record","where":{"tag":"name","value":"exact name"}},"field"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":["container"],"xml":"<entry>new text</entry>"}]} to append an XML element. Paths must identify existing nodes unambiguously. Never replace a whole section with a partial copy. For new sections, a full well-formed <state:name> XML string may be provided.
 
 For location map updates, put only changed maps under mapPatch local/region/world. Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. New tiles need id, name, x, y, w, h, and a new map needs id, name, tiles. Do not replace or omit existing tiles/roads. Use map initialization for newly entered places: 6\u201310 useful connected local locations, region/world tiles, roads, sensible dimensions, and known character pins at region/world scales. Unknown or hidden details must not be disclosed as fact.
