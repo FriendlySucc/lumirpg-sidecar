@@ -267,6 +267,36 @@ function sanitizeLayer(raw, scale, previous) {
   }
   const seenIds = new Set;
   const tiles = [];
+  let unitScale = 1;
+  if (!previous?.tiles.length && rawTiles.length > 0) {
+    let maxDim = 0;
+    let maxAbsCoord = 0;
+    let hasExplicitDim = false;
+    for (const item of rawTiles) {
+      if (!item || typeof item !== "object")
+        continue;
+      const r = item;
+      const rw = finiteNumber(r.w, NaN);
+      const rh = finiteNumber(r.h, NaN);
+      const rx = finiteNumber(r.x, NaN);
+      const ry = finiteNumber(r.y, NaN);
+      if (Number.isFinite(rw)) {
+        hasExplicitDim = true;
+        maxDim = Math.max(maxDim, Math.abs(rw));
+      }
+      if (Number.isFinite(rh)) {
+        hasExplicitDim = true;
+        maxDim = Math.max(maxDim, Math.abs(rh));
+      }
+      if (Number.isFinite(rx))
+        maxAbsCoord = Math.max(maxAbsCoord, Math.abs(rx));
+      if (Number.isFinite(ry))
+        maxAbsCoord = Math.max(maxAbsCoord, Math.abs(ry));
+    }
+    if (hasExplicitDim && maxDim > 0 && maxDim < 5) {
+      unitScale = maxAbsCoord * 10 <= 110 && maxDim * 10 <= 50 ? 10 : 5;
+    }
+  }
   for (let i = 0;i < Math.min(rawTiles.length, 48); i++) {
     const item = rawTiles[i];
     if (!item || typeof item !== "object")
@@ -279,10 +309,14 @@ function sanitizeLayer(raw, scale, previous) {
     while (seenIds.has(id))
       id = `${id}_${i}`;
     seenIds.add(id);
-    const w = clamp(snapGrid(Math.max(5, finiteNumber(row.w, scale === "local" ? 10 : 15))), 5, 60);
-    const h = clamp(snapGrid(Math.max(5, finiteNumber(row.h, scale === "local" ? 10 : 15))), 5, 60);
-    const x = clamp(snapGrid(finiteNumber(row.x, i % 4 * 15 - 30)), -120, 120);
-    const y = clamp(snapGrid(finiteNumber(row.y, Math.floor(i / 4) * 15 - 30)), -120, 120);
+    const rawW = finiteNumber(row.w, NaN);
+    const rawH = finiteNumber(row.h, NaN);
+    const rawX = finiteNumber(row.x, NaN);
+    const rawY = finiteNumber(row.y, NaN);
+    const w = clamp(snapGrid(Math.max(5, Number.isFinite(rawW) ? rawW * unitScale : scale === "local" ? 10 : 15)), 5, 60);
+    const h = clamp(snapGrid(Math.max(5, Number.isFinite(rawH) ? rawH * unitScale : scale === "local" ? 10 : 15)), 5, 60);
+    const x = clamp(snapGrid(Number.isFinite(rawX) ? rawX * unitScale : i % 4 * 15 - 30), -120, 120);
+    const y = clamp(snapGrid(Number.isFinite(rawY) ? rawY * unitScale : Math.floor(i / 4) * 15 - 30), -120, 120);
     const floor = scale === "local" ? clamp(Math.round(finiteNumber(row.floor, 0)), -10, 40) : 0;
     const features = Array.isArray(row.features) ? row.features.map((f) => cleanText(f, 120)).filter(Boolean).slice(0, 10) : [];
     const rawPins = Array.isArray(row.pins) ? row.pins : [];
@@ -1168,7 +1202,12 @@ All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and
 Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
 For non-empty existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) ALWAYS use precise operations: {"ops":[{"op":"set","path":["container",{"tag":"record","where":{"tag":"name","value":"exact name"}},"field"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":["container"],"xml":"<entry>new text</entry>"}]} to append an XML element (use "path":[] to append directly inside <state:name>). Paths must identify existing nodes unambiguously. NEVER send a raw XML string for a non-empty existing section. Only for missing or currently empty sections (e.g. <state:leads></state:leads>) may a full well-formed <state:name>...</state:name> XML string be provided.
 
-For location map updates, put only changed maps under mapPatch local/region/world. ${mapInitNote}Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. New tiles need id, name, x, y, w, h, and a new map needs id, name, tiles. Do not replace or omit existing tiles/roads. Use map initialization for newly entered places: 6\u201310 useful connected local locations, region/world tiles, roads, sensible dimensions, and known character pins at region/world scales. Unknown or hidden details must not be disclosed as fact.
+For location map updates, put only changed maps under mapPatch local/region/world. ${mapInitNote}Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. Do not replace or omit existing tiles/roads.
+Map geometry rules (REQUIRED for readable maps):
+- Coordinates (x, y, w, h) MUST be multiples of 5 on a 2D plane (+X east, +Y south), centered near (0, 0). NEVER use tiny 1-4 unit sizes.
+- Vary tile w and h by importance and scale so maps look organic and labels fit: local rooms/stalls 10-25 (hallways 5-10 wide, plazas/halls 20-30); region/world districts & realms 15-35 (major capitals/heartlands wider than borderlands/passes).
+- Pack neighboring tiles so touching areas share exact edges (e.g. A.x + A.w === B.x) instead of floating apart.
+- Every new tile needs id, name, kind, status, x, y, w, h, sizeLabel (e.g. "15 m", "2 km", "400 km"), summary, features, color (muted hex on region/world), and pins (player pin with isPlayer:true on current local/region/world tile, plus known NPC pins). Unknown or hidden details must not be disclosed as fact.
 
 Current saved state (reference only):
 ${renderStateForPrompt(state) || "(no existing state)"}

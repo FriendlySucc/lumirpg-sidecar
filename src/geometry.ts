@@ -339,6 +339,30 @@ export function sanitizeLayer(
   const seenIds = new Set<string>()
   const tiles: Tile[] = []
 
+  // Safety net: if a fresh layer uses tiny 1-4 unit coordinates (e.g. w:2, h:2), scale the whole
+  // layer up cleanly so proportions and shared edges survive the 5-unit grid snap.
+  let unitScale = 1
+  if (!previous?.tiles.length && rawTiles.length > 0) {
+    let maxDim = 0
+    let maxAbsCoord = 0
+    let hasExplicitDim = false
+    for (const item of rawTiles) {
+      if (!item || typeof item !== 'object') continue
+      const r = item as Record<string, unknown>
+      const rw = finiteNumber(r.w, NaN)
+      const rh = finiteNumber(r.h, NaN)
+      const rx = finiteNumber(r.x, NaN)
+      const ry = finiteNumber(r.y, NaN)
+      if (Number.isFinite(rw)) { hasExplicitDim = true; maxDim = Math.max(maxDim, Math.abs(rw)) }
+      if (Number.isFinite(rh)) { hasExplicitDim = true; maxDim = Math.max(maxDim, Math.abs(rh)) }
+      if (Number.isFinite(rx)) maxAbsCoord = Math.max(maxAbsCoord, Math.abs(rx))
+      if (Number.isFinite(ry)) maxAbsCoord = Math.max(maxAbsCoord, Math.abs(ry))
+    }
+    if (hasExplicitDim && maxDim > 0 && maxDim < 5) {
+      unitScale = maxAbsCoord * 10 <= 110 && maxDim * 10 <= 50 ? 10 : 5
+    }
+  }
+
   for (let i = 0; i < Math.min(rawTiles.length, 48); i++) {
     const item = rawTiles[i]
     if (!item || typeof item !== 'object') continue
@@ -351,10 +375,14 @@ export function sanitizeLayer(
     while (seenIds.has(id)) id = `${id}_${i}`
     seenIds.add(id)
 
-    const w = clamp(snapGrid(Math.max(5, finiteNumber(row.w, scale === 'local' ? 10 : 15))), 5, 60)
-    const h = clamp(snapGrid(Math.max(5, finiteNumber(row.h, scale === 'local' ? 10 : 15))), 5, 60)
-    const x = clamp(snapGrid(finiteNumber(row.x, (i % 4) * 15 - 30)), -120, 120)
-    const y = clamp(snapGrid(finiteNumber(row.y, Math.floor(i / 4) * 15 - 30)), -120, 120)
+    const rawW = finiteNumber(row.w, NaN)
+    const rawH = finiteNumber(row.h, NaN)
+    const rawX = finiteNumber(row.x, NaN)
+    const rawY = finiteNumber(row.y, NaN)
+    const w = clamp(snapGrid(Math.max(5, Number.isFinite(rawW) ? rawW * unitScale : (scale === 'local' ? 10 : 15))), 5, 60)
+    const h = clamp(snapGrid(Math.max(5, Number.isFinite(rawH) ? rawH * unitScale : (scale === 'local' ? 10 : 15))), 5, 60)
+    const x = clamp(snapGrid(Number.isFinite(rawX) ? rawX * unitScale : (i % 4) * 15 - 30), -120, 120)
+    const y = clamp(snapGrid(Number.isFinite(rawY) ? rawY * unitScale : Math.floor(i / 4) * 15 - 30), -120, 120)
     const floor = scale === 'local' ? clamp(Math.round(finiteNumber(row.floor, 0)), -10, 40) : 0
 
     const features = Array.isArray(row.features)

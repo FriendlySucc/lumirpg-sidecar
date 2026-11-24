@@ -241,6 +241,27 @@ describe('LumiAtlas geometry & sanitization', () => {
     expect(vb.w).toBeGreaterThanOrEqual(30)
   })
 
+  test('sanitizeProposal auto-scales tiny 1-4 unit tile grids so proportions and shared edges survive', () => {
+    const state = sanitizeProposal({
+      maps: {
+        world: {
+          id: 'dicathen_world',
+          name: 'Dicathen',
+          tiles: [
+            { id: 'heartland', name: 'Dicathen Heartland', x: 0, y: 0, w: 3, h: 2, status: 'current' },
+            { id: 'border', name: 'Wyrmathen Border', x: 3, y: 0, w: 2, h: 2, status: 'known' },
+          ],
+        },
+      },
+    }, 'chat_u', 'm1', 1)
+    const [heart, border] = state.maps.world.tiles
+    expect(heart.w).toBe(30)
+    expect(heart.h).toBe(20)
+    expect(border.x).toBe(30)
+    expect(border.w).toBe(20)
+    expect(findSharedEdge(heart, border)).not.toBeNull()
+  })
+
   test('buildAtlasPrompt embeds initialization rules and prior state when updating', () => {
     const prompt = buildAtlasPrompt(
       [{ role: 'assistant', content: 'You step into Kabuki Market under flickering neon.' }],
