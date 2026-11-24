@@ -26,7 +26,8 @@ declare const spindle: import('lumiverse-spindle-types').SpindleAPI
 
 const STORAGE_ROOT = 'lumi-atlas-v1'
 const MAX_ARCHIVES = 20
-const ANALYSIS_TIMEOUT_MS = 180_000
+const ANALYSIS_IDLE_TIMEOUT_MS = 180_000
+const ANALYSIS_MAX_TIMEOUT_MS = 600_000
 const MESSAGE_TAIL = 14
 const STREAM_THROTTLE_MS = 140
 
@@ -377,6 +378,8 @@ async function runAnalysis(
   let controller: AbortController | null = null
   let fallbackState: AtlasState | null = rt.record?.state ?? null
   let runId = `run_${Date.now()}`
+  let timedOut = false
+  let startedAt = Date.now()
 
   try {
     if (!spindle.permissions.has('generation')) {
@@ -451,7 +454,18 @@ async function runAnalysis(
     rt.controller = controller
     rt.busy = true
     const activeController = controller
-    rt.timer = setTimeout(() => activeController.abort(), ANALYSIS_TIMEOUT_MS)
+    timedOut = false
+    startedAt = Date.now()
+    const armIdleTimer = () => {
+      if (rt.timer) clearTimeout(rt.timer)
+      const remaining = ANALYSIS_MAX_TIMEOUT_MS - (Date.now() - startedAt)
+      const waitMs = Math.max(1_000, Math.min(ANALYSIS_IDLE_TIMEOUT_MS, remaining))
+      rt.timer = setTimeout(() => {
+        timedOut = true
+        activeController.abort()
+      }, waitMs)
+    }
+    armIdleTimer()
 
     runId = (spindle.host.capabilities['uuid-v1'] ?? 0) >= 1 ? await spindle.uuid.v7() : `run_${Date.now()}`
     spindle.log.info(`LumiAtlas: starting ${mode} (${runId}) on chat ${rt.chatId} via ${chosen.name} (${chosen.model})`)
@@ -496,6 +510,7 @@ async function runAnalysis(
       emitStream(rt.userId, rt.chatId, 'thinking', '', 0, '', origin)
       for await (const chunk of spindle.generate.rawStream(genRequest)) {
         if (controller.signal.aborted || myEpoch !== rt.epoch) return
+        armIdleTimer()
         if (chunk.type === 'reasoning') {
           reasoningAcc += chunk.token
         } else if (chunk.type === 'token') {
@@ -587,9 +602,11 @@ async function runAnalysis(
   } catch (err) {
     if (controller && myEpoch !== rt.epoch) return
     const isAbort = Boolean(controller?.signal.aborted) || (err instanceof Error && err.name === 'AbortError')
-    const detail = isAbort
-      ? 'Atlas update was cancelled or timed out. Previous map kept.'
-      : `Atlas update failed: ${err instanceof Error ? err.message : String(err)}`
+    const detail = timedOut
+      ? `Atlas update timed out after ${Math.round((Date.now() - startedAt) / 1000)}s. Previous map kept.`
+      : isAbort
+        ? 'Atlas update was cancelled. Previous map kept.'
+        : `Atlas update failed: ${err instanceof Error ? err.message : String(err)}`
     spindle.log.warn(`LumiAtlas (${runId}): ${detail}`)
     emitStatus(rt.userId, rt.chatId, 'error', detail, fallbackState, undefined, origin)
   } finally {

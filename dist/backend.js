@@ -1546,7 +1546,8 @@ function prepareSimulationContext(messages, state) {
 // src/backend.ts
 var STORAGE_ROOT = "lumi-atlas-v1";
 var MAX_ARCHIVES = 20;
-var ANALYSIS_TIMEOUT_MS = 180000;
+var ANALYSIS_IDLE_TIMEOUT_MS = 180000;
+var ANALYSIS_MAX_TIMEOUT_MS = 600000;
 var MESSAGE_TAIL = 14;
 var STREAM_THROTTLE_MS = 140;
 var runtimes = new Map;
@@ -1811,6 +1812,8 @@ async function runAnalysis(rt, mode, trigger, origin, expected) {
   let controller = null;
   let fallbackState = rt.record?.state ?? null;
   let runId = `run_${Date.now()}`;
+  let timedOut = false;
+  let startedAt = Date.now();
   try {
     if (!spindle.permissions.has("generation")) {
       if (trigger === "manual") {
@@ -1881,7 +1884,19 @@ async function runAnalysis(rt, mode, trigger, origin, expected) {
     rt.controller = controller;
     rt.busy = true;
     const activeController = controller;
-    rt.timer = setTimeout(() => activeController.abort(), ANALYSIS_TIMEOUT_MS);
+    timedOut = false;
+    startedAt = Date.now();
+    const armIdleTimer = () => {
+      if (rt.timer)
+        clearTimeout(rt.timer);
+      const remaining = ANALYSIS_MAX_TIMEOUT_MS - (Date.now() - startedAt);
+      const waitMs = Math.max(1000, Math.min(ANALYSIS_IDLE_TIMEOUT_MS, remaining));
+      rt.timer = setTimeout(() => {
+        timedOut = true;
+        activeController.abort();
+      }, waitMs);
+    };
+    armIdleTimer();
     runId = (spindle.host.capabilities["uuid-v1"] ?? 0) >= 1 ? await spindle.uuid.v7() : `run_${Date.now()}`;
     spindle.log.info(`LumiAtlas: starting ${mode} (${runId}) on chat ${rt.chatId} via ${chosen.name} (${chosen.model})`);
     emitStatus(rt.userId, rt.chatId, "updating", mode === "rebuild" ? `Rebuilding 3-layer Atlas with ${chosen.name}\u2026` : `Charting map update with ${chosen.name}\u2026`, record.state, effectiveConfig, origin, record.archives);
@@ -1913,6 +1928,7 @@ async function runAnalysis(rt, mode, trigger, origin, expected) {
       for await (const chunk of spindle.generate.rawStream(genRequest)) {
         if (controller.signal.aborted || myEpoch !== rt.epoch)
           return;
+        armIdleTimer();
         if (chunk.type === "reasoning") {
           reasoningAcc += chunk.token;
         } else if (chunk.type === "token") {
@@ -1988,7 +2004,7 @@ async function runAnalysis(rt, mode, trigger, origin, expected) {
     if (controller && myEpoch !== rt.epoch)
       return;
     const isAbort = Boolean(controller?.signal.aborted) || err instanceof Error && err.name === "AbortError";
-    const detail = isAbort ? "Atlas update was cancelled or timed out. Previous map kept." : `Atlas update failed: ${err instanceof Error ? err.message : String(err)}`;
+    const detail = timedOut ? `Atlas update timed out after ${Math.round((Date.now() - startedAt) / 1000)}s. Previous map kept.` : isAbort ? "Atlas update was cancelled. Previous map kept." : `Atlas update failed: ${err instanceof Error ? err.message : String(err)}`;
     spindle.log.warn(`LumiAtlas (${runId}): ${detail}`);
     emitStatus(rt.userId, rt.chatId, "error", detail, fallbackState, undefined, origin);
   } finally {
