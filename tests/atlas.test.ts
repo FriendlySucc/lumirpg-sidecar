@@ -19,6 +19,10 @@ describe('LumiAtlas geometry & sanitization', () => {
     expect(extractJsonObject('Notes before {"maps":{"local":{"tiles":[]}}} trailing')).toEqual({
       maps: { local: { tiles: [] } },
     })
+    // Minor LLM JSON quirks: raw newlines in strings, \' escapes, trailing commas
+    expect(extractJsonObject('```json\n{"note":"line1\nline2 it\\\'s ok",}\n```')).toEqual({
+      note: "line1\nline2 it's ok",
+    })
     expect(() => extractJsonObject('no json here')).toThrow()
   })
 

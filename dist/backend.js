@@ -76,30 +76,111 @@ function emptyAtlasState(chatId) {
     notes: ["No map snapshot yet. Click Analyze to chart this chat."]
   };
 }
+function repairJsonText(input) {
+  let out = "";
+  let inString = false;
+  for (let i = 0;i < input.length; i++) {
+    const ch = input[i];
+    if (inString) {
+      if (ch === "\\") {
+        const next = input[i + 1];
+        if (next === undefined) {
+          out += "\\\\";
+        } else if ('"\\/bfnrt'.includes(next)) {
+          out += ch + next;
+          i++;
+        } else if (next === "u" && /^[0-9a-fA-F]{4}$/.test(input.slice(i + 2, i + 6))) {
+          out += input.slice(i, i + 6);
+          i += 5;
+        } else if (next === "'") {
+          out += "'";
+          i++;
+        } else {
+          out += "\\\\" + next;
+          i++;
+        }
+      } else if (ch === '"') {
+        inString = false;
+        out += ch;
+      } else if (ch === "\r") {
+        if (input[i + 1] === `
+`)
+          i++;
+        out += "\\n";
+      } else if (ch === `
+`) {
+        out += "\\n";
+      } else if (ch === "\t") {
+        out += "\\t";
+      } else if (ch.charCodeAt(0) < 32) {} else {
+        out += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inString = true;
+        out += ch;
+      } else if (ch === ",") {
+        let j = i + 1;
+        while (j < input.length && /\s/.test(input[j]))
+          j++;
+        if (input[j] === "}" || input[j] === "]") {
+          continue;
+        }
+        out += ch;
+      } else {
+        out += ch;
+      }
+    }
+  }
+  return out;
+}
+function tryParseObject(text) {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return { ok: true, value: parsed };
+    }
+    return { ok: false, error: "Root JSON value was not an object" };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
 function extractJsonObject(raw) {
   const trimmed = raw.trim();
   if (!trimmed)
     throw new Error("Analyzer returned an empty response.");
-  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenceMatch ? fenceMatch[1].trim() : trimmed;
-  try {
-    const parsed = JSON.parse(candidate);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed;
-    }
-  } catch {}
+  let candidate = trimmed;
+  if (/^```/i.test(candidate)) {
+    candidate = candidate.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+  } else {
+    const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*)```/i);
+    if (fenceMatch)
+      candidate = fenceMatch[1].trim();
+  }
+  const direct = tryParseObject(candidate);
+  if (direct.ok)
+    return direct.value;
   const start = candidate.indexOf("{");
   const end = candidate.lastIndexOf("}");
+  let lastErr = direct.error;
   if (start >= 0 && end > start) {
     const slice = candidate.slice(start, end + 1);
-    try {
-      const parsed = JSON.parse(slice);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        return parsed;
-      }
-    } catch {}
+    const sliced = tryParseObject(slice);
+    if (sliced.ok)
+      return sliced.value;
+    lastErr = sliced.error;
+    const repaired = tryParseObject(repairJsonText(slice));
+    if (repaired.ok)
+      return repaired.value;
+    lastErr = repaired.error;
+  } else {
+    const repaired = tryParseObject(repairJsonText(candidate));
+    if (repaired.ok)
+      return repaired.value;
+    lastErr = repaired.error;
   }
-  throw new Error("Analyzer response did not contain valid JSON.");
+  const tail = candidate.slice(-80).replace(/\s+/g, " ").trim();
+  throw new Error(`Analyzer response did not contain valid JSON (${lastErr}; tail: "${tail}").`);
 }
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
