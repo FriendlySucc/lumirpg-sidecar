@@ -15,6 +15,7 @@ let messages: any[] = [
 ]
 let release: (() => void) | undefined
 let waitForRelease = false
+let nextMapPatch: Record<string, unknown> = {}
 const configKey = 'lumi-atlas-v1/config.json'
 const chatKey = 'lumi-atlas-v1/chats/test-chat.json'
 const mock: Obj = {
@@ -30,7 +31,7 @@ const mock: Obj = {
   generate:{rawStream:async function* (request:Obj){
     requests.push(request)
     if(waitForRelease) await new Promise<void>(resolve=>{release=resolve})
-    yield {type:'done',content:JSON.stringify({statePatch:{world:{fields:{time:'noon'}}},mapPatch:{}}),finish_reason:'stop'}
+    yield {type:'done',content:JSON.stringify({statePatch:{world:{fields:{time:'noon'}}},mapPatch:nextMapPatch}),finish_reason:'stop'}
   }},
   on:(name:string, fn:any)=>{ const a=events.get(name)??[]; a.push(fn); events.set(name,a); return ()=>{} },
   onFrontendMessage:(fn:any)=>{frontend=fn},
@@ -89,7 +90,36 @@ test('a changed or deleted source during the model call cannot overwrite the sav
   emit('GENERATION_ENDED',{chatId:chat,generationId:'g2',generationType:'normal',messageId:'a2'})
   await waitUntil(()=>Boolean(release))
   messages[messages.length-1].content='This reply was edited.'
+  waitForRelease=false
   release!()
   await waitUntil(()=>outbound.some(x=>x.type==='status'&&x.status==='stale'))
   expect(writes.get(chatKey).internalState).toEqual(saved.internalState)
+})
+
+test('manual rebuild starts from a clean map instead of stacking onto old tiles', async()=>{
+  waitForRelease = false
+  messages[0].name = 'Kris Lyons'
+  // First rebuild seeds a stale tile into the cached chat record
+  nextMapPatch = {
+    local: {
+      id: 'old_zone',
+      name: 'Old Zone',
+      tiles: [{ id: 'stale_tile', name: 'Stale Tile', x: 0, y: 0, w: 10, h: 10, status: 'current' }],
+    },
+  }
+  let beforeCount = requests.length
+  await frontend!({type:'analyze',chatId:chat,mode:'rebuild'},user)
+  await waitUntil(()=>requests.length > beforeCount)
+  await waitUntil(()=>writes.get(chatKey).state.maps.local.tiles.some((t:any)=>t.id==='stale_tile'))
+
+  // Second rebuild with an empty mapPatch must start clean (no stale_tile in prompt or result)
+  nextMapPatch = {}
+  beforeCount = requests.length
+  await frontend!({type:'analyze',chatId:chat,mode:'rebuild'},user)
+  await waitUntil(()=>requests.length > beforeCount)
+  const rebuildPrompt = requests[requests.length - 1].messages.map((m:any)=>m.content).join('\n')
+  expect(rebuildPrompt).not.toContain('stale_tile')
+  expect(rebuildPrompt).toContain('Player character name: "Kris Lyons"')
+  await waitUntil(()=>writes.get(chatKey).state.maps.local.tiles.length === 0)
+  expect(writes.get(chatKey).state.maps.local.tiles).toHaveLength(0)
 })

@@ -270,6 +270,7 @@ async function readRecentMessages(chatId: string): Promise<{
   originalMessages: PromptMessage[]
   latestSource: SourceRevision | null
   latestMessageId: string | null
+  playerName: string | null
   totalRead: number
 }> {
   const useLean = (spindle.host.capabilities['chat-lean-messages-v1'] ?? 0) >= 1
@@ -291,18 +292,21 @@ async function readRecentMessages(chatId: string): Promise<{
   const originalMessages: PromptMessage[] = []
   let latestSource: SourceRevision | null = null
   let latestMessageId: string | null = null
+  let playerName: string | null = null
 
   for (const msg of visible) {
-    originalMessages.push({ role: msg.role, content: msg.content })
+    const speaker = typeof msg.name === 'string' && msg.name.trim() ? msg.name.trim() : undefined
+    if (msg.role === 'user' && speaker) playerName = speaker
+    originalMessages.push({ role: msg.role, content: msg.content, ...(speaker ? { name: speaker } : {}) })
     const cleaned = prepareMessageText(msg.content)
-    if (cleaned) messages.push({ role: msg.role, content: cleaned })
+    if (cleaned) messages.push({ role: msg.role, content: cleaned, ...(speaker ? { name: speaker } : {}) })
     if (typeof msg.id === 'string' && msg.id) {
       latestMessageId = msg.id
       latestSource = { id: msg.id, role: msg.role, swipe_id: Number.isInteger(msg.swipe_id) ? msg.swipe_id : 0, content: msg.content }
     }
   }
 
-  return { messages, originalMessages, latestSource, latestMessageId, totalRead: visible.length }
+  return { messages, originalMessages, latestSource, latestMessageId, playerName, totalRead: visible.length }
 }
 
 function archiveLayerIfChanged(record: StoredChatRecord, nextState: AtlasState): Record<Scale, MapLayer[]> {
@@ -418,7 +422,7 @@ async function runAnalysis(
     }
 
     if (!await spindle.chats.get(rt.chatId, rt.userId)) throw new Error('Chat is unavailable for this user.')
-    const { messages, originalMessages, latestSource, latestMessageId, totalRead } = await readRecentMessages(rt.chatId)
+    const { messages, originalMessages, latestSource, latestMessageId, playerName, totalRead } = await readRecentMessages(rt.chatId)
     if (!messages.length || !latestSource || latestSource.role !== 'assistant') {
       emitStatus(rt.userId, rt.chatId, 'error', 'No current assistant reply to simulate yet.', record.state, effectiveConfig, origin, record.archives, record.internalState)
       return
@@ -434,7 +438,8 @@ async function runAnalysis(
       // Manual rebuild re-reads the current transcript and writes a new snapshot
       // only after the source is verified unchanged at commit time.
     }
-    let seedState = record.internalState
+    const baseMap = mode === 'rebuild' ? emptyAtlasState(rt.chatId) : record.state
+    let seedState = mode === 'rebuild' ? undefined : record.internalState
     if (!seedState) {
       const migrated = migrateLastInternalState(originalMessages)
       seedState = Object.keys(migrated.sections).length || migrated.ledger ? migrated : blankInternalState()
@@ -464,7 +469,7 @@ async function runAnalysis(
       record.archives,
     )
 
-    const userPrompt = buildUnifiedPrompt(messages, record.state, seedState)
+    const userPrompt = buildUnifiedPrompt(messages, baseMap, seedState, playerName)
     const effectiveModel = chosen.model.trim()
     const genParams: Record<string, unknown> = { temperature: 0.2, max_tokens: 8192 }
     if (effectiveModel) genParams.model = effectiveModel
@@ -530,7 +535,7 @@ async function runAnalysis(
 
     const parsed = extractUnifiedDelta(content)
     const nextInternalState = applyStateDelta(seedState, parsed.statePatch)
-    const patchedAtlas = applyMapDelta(record.state, parsed.mapPatch)
+    const patchedAtlas = applyMapDelta(baseMap, parsed.mapPatch)
     const nextState: AtlasState = {
       ...patchedAtlas,
       updatedAt: new Date().toISOString(),

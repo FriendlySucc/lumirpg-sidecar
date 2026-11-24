@@ -3,6 +3,7 @@ import type { AtlasState } from './types.js'
 export interface PromptMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
+  name?: string
 }
 
 export const SYSTEM_PROMPT = `You are LumiAtlas, a dedicated cartographer for an interactive roleplay world.
