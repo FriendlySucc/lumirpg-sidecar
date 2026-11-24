@@ -8,8 +8,19 @@ export const UNIFIED_SYSTEM_PROMPT = `You are the separate LumiAtlas background 
 /** Sent only to the separately configured analyzer, never to the RP model. */
 export function buildUnifiedPrompt(messages: PromptMessage[], map: AtlasState, state: InternalState): string {
   const transcript = messages.map((m, i) => `[${i + 1} ${m.role.toUpperCase()}]\n${m.content.slice(0, 10000)}`).join('\n\n---\n\n')
+  const emptyScales = (['local', 'region', 'world'] as const).filter(s => !map.maps[s]?.tiles?.length)
+  const mapInitNote = emptyScales.length
+    ? `INITIALIZATION REQUIRED for empty map layer(s): ${emptyScales.join(', ')}. Populate EVERY empty layer in mapPatch now (build world once with 6–10 macro regions/kingdoms/districts and preserve it on later turns; build region with 6–10 surrounding areas; build local with 6–10 connected tiles). `
+    : ''
+  const populatedSections = Object.values(state.sections).filter(xml => {
+    const inner = xml.replace(/^<state:[^>]+>|<\/state:[^>]+>$/g, '').trim()
+    return Boolean(inner && inner !== '∅' && inner !== 'Ø')
+  }).length
+  const stateInitNote = populatedSections <= 2
+    ? 'INITIALIZATION PASS: Most state sections are empty. Seed EVERY section supported by the story and backstory — including inv (gear/currency/status), dam & pair (established party/allies/rivals), reputation (group standing), tracks, arc, chekhov, leads, and offscreen_agendas whenever the transcript establishes them.\n'
+    : ''
   return `Update the state and map from this story using ONE JSON object: {"statePatch": {}, "mapPatch": {}}.
-Only include changes. DO NOT remove records, fields, prior memories, relationships or tiles merely because absent from the latest message. Never fabricate player knowledge, NPC private knowledge, ledger awakenings, rewards, or hidden locations. Keep distinguishable characters separate. Preserve established location coordinates, reciprocal connections, temporal pacing, current story continuity and exact entity identities. Draft suggested new map features only as such, not established narrative facts.
+${stateInitNote}Only include changes. DO NOT remove records, fields, prior memories, relationships or tiles merely because absent from the latest message. Never fabricate player knowledge, NPC private knowledge, ledger awakenings, rewards, or hidden locations. Keep distinguishable characters separate. Preserve established location coordinates, reciprocal connections, temporal pacing, current story continuity and exact entity identities. Draft suggested new map features only as such, not established narrative facts.
 
 State sections in order: ${STATE_SECTIONS.join(', ')}.
 All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and only the exact field names below are allowed:
@@ -26,10 +37,18 @@ All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and
   dam (identity N1→N2): sluice, filters, misc, intent
   pair (identity N1↔N2): mode, dam, matrix, wall
 - Memory section (append-only): entityMem uses {"append":[{"name":"exact character","entries":["fact | T:... | V:... | C:..."]}]}.
+- Other sections (XML tags when initializing an empty section):
+  locations: <loc_rend><id>..</id><name>..</name><features>..</features></loc_rend>
+  reputation: <ent_rep><name>Faction/Group</name><standing>..</standing></ent_rep>
+  tracks: <main>..</main><track>Name | status | details</track>
+  arc: <info>..</info><ki>..</ki><sho>..</sho><ten>..</ten><ketsu>..</ketsu>
+  chekhov: <chamber><bullet>..</bullet></chamber>
+  leads: <active_leads><lead>..</lead></active_leads><usable><lead>..</lead></usable>
+  notebook: <ent>..</ent>
 Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
 For non-empty existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) ALWAYS use precise operations: {"ops":[{"op":"set","path":["container",{"tag":"record","where":{"tag":"name","value":"exact name"}},"field"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":["container"],"xml":"<entry>new text</entry>"}]} to append an XML element (use "path":[] to append directly inside <state:name>). Paths must identify existing nodes unambiguously. NEVER send a raw XML string for a non-empty existing section. Only for missing or currently empty sections (e.g. <state:leads></state:leads>) may a full well-formed <state:name>...</state:name> XML string be provided.
 
-For location map updates, put only changed maps under mapPatch local/region/world. Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. New tiles need id, name, x, y, w, h, and a new map needs id, name, tiles. Do not replace or omit existing tiles/roads. Use map initialization for newly entered places: 6–10 useful connected local locations, region/world tiles, roads, sensible dimensions, and known character pins at region/world scales. Unknown or hidden details must not be disclosed as fact.
+For location map updates, put only changed maps under mapPatch local/region/world. ${mapInitNote}Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. New tiles need id, name, x, y, w, h, and a new map needs id, name, tiles. Do not replace or omit existing tiles/roads. Use map initialization for newly entered places: 6–10 useful connected local locations, region/world tiles, roads, sensible dimensions, and known character pins at region/world scales. Unknown or hidden details must not be disclosed as fact.
 
 Current saved state (reference only):
 ${renderStateForPrompt(state) || '(no existing state)'}

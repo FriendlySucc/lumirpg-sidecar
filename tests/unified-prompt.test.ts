@@ -11,6 +11,8 @@ test('one analyzer prompt describes state and maps as a combined incremental upd
   expect(prompt).toContain('mapPatch')
   expect(prompt).toContain('reputation')
   expect(prompt).toContain('DO NOT remove')
+  expect(prompt).toContain('INITIALIZATION PASS')
+  expect(prompt).toContain('INITIALIZATION REQUIRED for empty map layer(s): local, region, world')
 })
 
 test('missing or malformed unified update is rejected and empty patches are accepted', () => {

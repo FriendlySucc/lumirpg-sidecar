@@ -1131,8 +1131,16 @@ ${m.content.slice(0, 1e4)}`).join(`
 ---
 
 `);
+  const emptyScales = ["local", "region", "world"].filter((s) => !map.maps[s]?.tiles?.length);
+  const mapInitNote = emptyScales.length ? `INITIALIZATION REQUIRED for empty map layer(s): ${emptyScales.join(", ")}. Populate EVERY empty layer in mapPatch now (build world once with 6\u201310 macro regions/kingdoms/districts and preserve it on later turns; build region with 6\u201310 surrounding areas; build local with 6\u201310 connected tiles). ` : "";
+  const populatedSections = Object.values(state.sections).filter((xml) => {
+    const inner = xml.replace(/^<state:[^>]+>|<\/state:[^>]+>$/g, "").trim();
+    return Boolean(inner && inner !== "\u2205" && inner !== "\xD8");
+  }).length;
+  const stateInitNote = populatedSections <= 2 ? `INITIALIZATION PASS: Most state sections are empty. Seed EVERY section supported by the story and backstory \u2014 including inv (gear/currency/status), dam & pair (established party/allies/rivals), reputation (group standing), tracks, arc, chekhov, leads, and offscreen_agendas whenever the transcript establishes them.
+` : "";
   return `Update the state and map from this story using ONE JSON object: {"statePatch": {}, "mapPatch": {}}.
-Only include changes. DO NOT remove records, fields, prior memories, relationships or tiles merely because absent from the latest message. Never fabricate player knowledge, NPC private knowledge, ledger awakenings, rewards, or hidden locations. Keep distinguishable characters separate. Preserve established location coordinates, reciprocal connections, temporal pacing, current story continuity and exact entity identities. Draft suggested new map features only as such, not established narrative facts.
+${stateInitNote}Only include changes. DO NOT remove records, fields, prior memories, relationships or tiles merely because absent from the latest message. Never fabricate player knowledge, NPC private knowledge, ledger awakenings, rewards, or hidden locations. Keep distinguishable characters separate. Preserve established location coordinates, reciprocal connections, temporal pacing, current story continuity and exact entity identities. Draft suggested new map features only as such, not established narrative facts.
 
 State sections in order: ${STATE_SECTIONS.join(", ")}.
 All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and only the exact field names below are allowed:
@@ -1149,10 +1157,18 @@ All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and
   dam (identity N1\u2192N2): sluice, filters, misc, intent
   pair (identity N1\u2194N2): mode, dam, matrix, wall
 - Memory section (append-only): entityMem uses {"append":[{"name":"exact character","entries":["fact | T:... | V:... | C:..."]}]}.
+- Other sections (XML tags when initializing an empty section):
+  locations: <loc_rend><id>..</id><name>..</name><features>..</features></loc_rend>
+  reputation: <ent_rep><name>Faction/Group</name><standing>..</standing></ent_rep>
+  tracks: <main>..</main><track>Name | status | details</track>
+  arc: <info>..</info><ki>..</ki><sho>..</sho><ten>..</ten><ketsu>..</ketsu>
+  chekhov: <chamber><bullet>..</bullet></chamber>
+  leads: <active_leads><lead>..</lead></active_leads><usable><lead>..</lead></usable>
+  notebook: <ent>..</ent>
 Unknown and untouched fields are omitted. Never infer an NPC's private knowledge from omniscient text. In pair matrices preserve all 12 emoji axes and their order. Reputation is collective group standing only. Ledger remains absent or dormant unless explicitly activated; do not emit rewards, stats, notices, or pretend its module is enabled.
 For non-empty existing sections (locations, reputation, tracks, arc, chekhov, leads, notebook) ALWAYS use precise operations: {"ops":[{"op":"set","path":["container",{"tag":"record","where":{"tag":"name","value":"exact name"}},"field"],"value":"new text"}]} to set a scalar, or {"ops":[{"op":"append","path":["container"],"xml":"<entry>new text</entry>"}]} to append an XML element (use "path":[] to append directly inside <state:name>). Paths must identify existing nodes unambiguously. NEVER send a raw XML string for a non-empty existing section. Only for missing or currently empty sections (e.g. <state:leads></state:leads>) may a full well-formed <state:name>...</state:name> XML string be provided.
 
-For location map updates, put only changed maps under mapPatch local/region/world. Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. New tiles need id, name, x, y, w, h, and a new map needs id, name, tiles. Do not replace or omit existing tiles/roads. Use map initialization for newly entered places: 6\u201310 useful connected local locations, region/world tiles, roads, sensible dimensions, and known character pins at region/world scales. Unknown or hidden details must not be disclosed as fact.
+For location map updates, put only changed maps under mapPatch local/region/world. ${mapInitNote}Use existing map id, changed tiles as [{"id":"existing-id","summary":"changed text"}], changed roads as [{"from":"id","to":"id","kind":"road"}]. New tiles need id, name, x, y, w, h, and a new map needs id, name, tiles. Do not replace or omit existing tiles/roads. Use map initialization for newly entered places: 6\u201310 useful connected local locations, region/world tiles, roads, sensible dimensions, and known character pins at region/world scales. Unknown or hidden details must not be disclosed as fact.
 
 Current saved state (reference only):
 ${renderStateForPrompt(state) || "(no existing state)"}
@@ -1715,7 +1731,7 @@ async function runAnalysis(rt, mode, trigger, origin, expected) {
     emitStatus(rt.userId, rt.chatId, "updating", mode === "rebuild" ? `Rebuilding 3-layer Atlas with ${chosen.name}\u2026` : `Charting map update with ${chosen.name}\u2026`, record.state, effectiveConfig, origin, record.archives);
     const userPrompt = buildUnifiedPrompt(messages, record.state, seedState);
     const effectiveModel = chosen.model.trim();
-    const genParams = { temperature: 0.2, max_tokens: 4800 };
+    const genParams = { temperature: 0.2, max_tokens: 8192 };
     if (effectiveModel)
       genParams.model = effectiveModel;
     const genRequest = {

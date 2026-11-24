@@ -466,7 +466,7 @@ async function runAnalysis(
 
     const userPrompt = buildUnifiedPrompt(messages, record.state, seedState)
     const effectiveModel = chosen.model.trim()
-    const genParams: Record<string, unknown> = { temperature: 0.2, max_tokens: 4800 }
+    const genParams: Record<string, unknown> = { temperature: 0.2, max_tokens: 8192 }
     if (effectiveModel) genParams.model = effectiveModel
     const genRequest = {
       type: 'raw' as const,
