@@ -296,14 +296,33 @@ function setDirectFields(xml: string, parent: XmlNode, fields: Record<string, un
 function updateRecordSection(section: string, sectionName: string, records: unknown): string {
   const spec = Object.hasOwn(RECORDS, sectionName) ? RECORDS[sectionName] : undefined
   if (!spec || !Array.isArray(records)) throw new Error(`Invalid ${sectionName} records`)
+  const allowedIdKeys = spec.identity === 'name' ? ['name'] : ['name', spec.identity]
   for (const entry of records) {
     const row = plainObject(entry, 'record')
-    onlyKeys(row, ['name', 'fields'], 'record')
-    if (typeof row.name !== 'string' || !row.name.trim()) throw new Error('Invalid record identity')
-    const rawFields = plainObject(row.fields, 'record fields')
+    const rawName = typeof row.name === 'string' && row.name.trim() ? row.name : undefined
+    const rawAltId =
+      spec.identity !== 'name' && typeof row[spec.identity] === 'string' && (row[spec.identity] as string).trim()
+        ? (row[spec.identity] as string)
+        : undefined
+    if (rawName !== undefined && rawAltId !== undefined && rawName !== rawAltId) {
+      throw new Error(`Conflicting record identity in ${sectionName}`)
+    }
+    const recordName = rawName ?? rawAltId
+    if (!recordName) throw new Error(`Invalid record identity in ${sectionName}`)
+    let rawFields: Record<string, unknown>
+    if (Object.hasOwn(row, 'fields')) {
+      onlyKeys(row, [...allowedIdKeys, 'fields'], `${sectionName} record`)
+      rawFields = plainObject(row.fields, `${sectionName} record fields`)
+    } else {
+      rawFields = {}
+      for (const [key, val] of Object.entries(row)) {
+        if (allowedIdKeys.includes(key)) continue
+        rawFields[key] = val
+      }
+    }
     const fields: Record<string, unknown> = {}
     for (const [key, val] of Object.entries(rawFields)) {
-      if (key === spec.identity && val === row.name) continue
+      if ((key === spec.identity || key === 'name') && val === recordName) continue
       fields[key] = val
     }
     const root = sectionRoot(section, sectionName)
@@ -311,11 +330,11 @@ function updateRecordSection(section: string, sectionName: string, records: unkn
       if (child.name !== spec.tag) return false
       const ids = child.children.filter(item => item.name === spec.identity)
       if (ids.length !== 1) throw new Error('Invalid record identity')
-      return nodeText(section, ids[0]) === row.name
+      return nodeText(section, ids[0]) === recordName
     })
     if (candidates.length > 1) throw new Error('Ambiguous record identity')
     if (!candidates.length) {
-      const record = `<${spec.tag}><${spec.identity}>${escapeText(row.name)}</${spec.identity}></${spec.tag}>`
+      const record = `<${spec.tag}><${spec.identity}>${escapeText(recordName)}</${spec.identity}></${spec.tag}>`
       section = insertInto(section, root, record)
       const newRoot = sectionRoot(section, sectionName)
       section = setDirectFields(section, newRoot.children[newRoot.children.length - 1], fields, spec.fields, sectionName)
@@ -533,7 +552,8 @@ function plainObject(value: unknown, label: string): Record<string, unknown> {
 }
 
 function onlyKeys(obj: Record<string, unknown>, keys: readonly string[], label: string): void {
-  if (Object.keys(obj).some(key => !keys.includes(key))) throw new Error(`Invalid ${label} key`)
+  const bad = Object.keys(obj).filter(key => !keys.includes(key))
+  if (bad.length) throw new Error(`Invalid ${label} key (${bad.join(', ')}; allowed: ${keys.join(', ')})`)
 }
 
 function sectionRoot(section: string, name: string): XmlNode {

@@ -374,4 +374,12 @@ test('field patch escapes arbitrary text and rejects unrecognized fields', () =>
   const echoed = applyStateDelta(offscreen, { offscreen_agendas: { records: [{ name: 'Fox', fields: { name: 'Fox', loc: 'Market' } }] } })
   expect(echoed.sections.offscreen_agendas).toContain('<loc>Market</loc>')
   expect(() => applyStateDelta(offscreen, { offscreen_agendas: { records: [{ name: 'Fox', fields: { name: 'Other', loc: 'Market' } }] } })).toThrow(/name/)
+  // Accepts section-specific identity aliases (pair/names) and flat record fields, while rejecting unknown keys
+  const flatDam = applyStateDelta({ sections: {} }, {
+    dam: { records: [{ pair: 'Grid→Kris', sluice: 'E:s L:s', intent: 'Push him out' }] },
+    pair: { records: [{ names: 'Grid↔Kris', fields: { mode: 'HOSTILE', wall: 'Betrayal' } }] },
+  })
+  expect(flatDam.sections.dam).toContain('<pair>Grid→Kris</pair><sluice>E:s L:s</sluice>')
+  expect(flatDam.sections.pair).toContain('<names>Grid↔Kris</names><mode>HOSTILE</mode>')
+  expect(() => applyStateDelta(offscreen, { offscreen_agendas: { records: [{ name: 'Fox', bogusKey: 'nope' }] } })).toThrow(/bogusKey/)
 })
