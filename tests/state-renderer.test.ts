@@ -134,4 +134,43 @@ describe('native Vexa GFX state renderers', () => {
     expect(nbEl.querySelectorAll('.la-nb-row').length).toBe(1)
     expect(nbEl.textContent).toContain('headed west into the crowd.')
   })
+
+  test('Pairs renders fallback stat progress bars for non-Vexa emoji matrices and shortens long badges', () => {
+    const raw = `<state:pair>
+      <pair>
+        <names>Kris — Moonspun Wyrmkin↔Grid</names>
+        <mode>BETRAYED / ESTRANGED — Grid expelled Kris</mode>
+        <matrix>❤️ 1 | 🔥 1 | ⚡ 5 | 🧠 4</matrix>
+        <wall>Grid's jealousy</wall>
+      </pair>
+    </state:pair>`
+
+    const expanded = render('pair', raw, ['pair:Kris — Moonspun Wyrmkin↔Grid'])
+    expect(expanded.querySelector('.la-card-badge')?.textContent).toBe('BETRAYED / ESTRANGED')
+    expect(expanded.querySelectorAll('.la-stat-cell').length).toBe(4)
+    expect(expanded.querySelectorAll('.la-stat-fill').length).toBe(4)
+  })
+
+  test('Reputation renders bidirectional standing progress bar with shortened badge', () => {
+    const raw = `<state:reputation>
+      <ent_rep>
+        <name>Hero's Party</name>
+        <standing>Hostile / Severed — Grid expelled Kris hours ago</standing>
+      </ent_rep>
+      <ent_rep>
+        <name>Guild Watch</name>
+        <score>+450</score>
+        <standing>Trusted</standing>
+        <note>Helped clear the east road</note>
+      </ent_rep>
+    </state:reputation>`
+
+    const expanded = render('reputation', raw, ["reputation:Hero's Party:0", 'reputation:Guild Watch:1'])
+    expect(expanded.querySelectorAll('.la-rep-meter').length).toBe(2)
+    const badges = Array.from(expanded.querySelectorAll('.la-card-badge')).map((b) => b.textContent)
+    expect(badges).toEqual(['Hostile / Severed', 'Trusted'])
+    expect(expanded.textContent).toContain('-750 (est.)')
+    expect(expanded.textContent).toContain('+450')
+    expect(expanded.textContent).toContain('Helped clear the east road')
+  })
 })

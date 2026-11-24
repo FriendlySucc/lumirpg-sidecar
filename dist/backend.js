@@ -1305,12 +1305,12 @@ All field values MUST be strings (e.g. "ct":"28", never numbers or objects), and
   offscreen_agendas: loc, agenda, why, goal, end, mood, tfdy, salience
   entity_state: fontColor, look, voice, persona, private
   thoughts: tQ1, tQ2, tQ3, tQ4, tQ5
-  dam (identity N1\u2192N2): sluice, filters, misc, intent
-  pair (identity N1\u2194N2): mode, dam, matrix, wall
+  dam (identity N1\u2192N2): sluice (e.g. "E:s L:o"), filters (e.g. "Soc:[open] Val:[cracked] Comp:[open] Rel:[hard]"), misc (e.g. "clash:no | T:no"), intent
+  pair (identity N1\u2194N2): mode (short 1-2 word label, e.g. "WARM", "STRANGER", "HOSTILE"), dam (e.g. "E:s L:o Gate:attentive"), matrix (MUST use exact 12 Vexa emoji axes in [val,acc] format: "\uD83C\uDF36\uFE0F[3,0] \uD83C\uDFB2[3,0] \uD83E\uDD1D[3,0] \uD83D\uDEE0\uFE0F[3,0] \uD83C\uDFE0[3,0] \uD83D\uDD4A\uFE0F[3,0] \uD83D\uDE20[3,0] \uD83E\uDD4A[3,0] \u2744\uFE0F[3,0] \uD83E\uDEA8[3,0] \uD83C\uDF2B\uFE0F[3,0] \uD83D\uDC0D[3,0]"), wall
 - Memory section (append-only): entityMem uses {"append":[{"name":"exact character","entries":["fact | T:... | V:... | C:..."]}]}.
 - Other sections (XML tags when initializing an empty section):
   locations: <loc_rend><id>..</id><name>..</name><features>..</features></loc_rend>
-  reputation: <ent_rep><name>Faction/Group</name><standing>..</standing></ent_rep>
+  reputation: <ent_rep><name>Faction/Group</name><score>-400</score><standing>Hostile</standing><note>Reason &amp; current situation</note></ent_rep> (score is -1000..+1000; standing is a short tier label)
   tracks: <main>..</main><track>Name | status | details</track>
   arc: <info>..</info><ki>..</ki><sho>..</sho><ten>..</ten><ketsu>..</ketsu>
   chekhov: <chamber><bullet>..</bullet></chamber>

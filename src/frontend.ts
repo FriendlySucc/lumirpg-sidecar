@@ -186,7 +186,7 @@ const STYLES = `
 }
 .la-card-open { border-color: #c4973c; }
 .la-card-head {
-  display: flex; align-items: center; gap: 0.55em;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4em 0.55em;
   padding: 0.65em 0.8em;
   min-height: 2.75em;
   cursor: pointer;
@@ -199,11 +199,12 @@ const STYLES = `
 }
 .la-card-chevron { font-size: 0.95em; color: #c4973c; width: 1.1em; text-align: center; flex: none; }
 .la-card-icon { font-size: 1.1em; min-width: 1.35em; text-align: center; line-height: 1.1; flex: none; }
-.la-card-name { font-weight: 700; font-size: 1em; color: #ece5da; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.la-card-name { font-weight: 700; font-size: 1em; color: #ece5da; flex: 1 1 8em; min-width: 0; overflow-wrap: break-word; word-break: normal; }
 .la-loc-id { font-family: var(--lumiverse-font-mono, ui-monospace, monospace); font-size: 0.78em; color: #8a8078; background: #231e19; padding: 1px 4px; border-radius: 3px; }
 .la-card-badge {
   font-size: 0.78em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 0.16em 0.55em; border-radius: 999px; flex: none;
+  padding: 0.16em 0.55em; border-radius: 999px; flex: 0 1 auto; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   background: #252018; border: 1px solid #4a3d2e; color: #d4b886;
 }
 .la-card-body { padding: 7px 9px; display: flex; flex-direction: column; gap: 6px; }
@@ -302,6 +303,16 @@ const STYLES = `
 .la-axis-half-pos { justify-content: flex-start; }
 .la-axis-center { width: 2px; height: 100%; background: #4a4036; flex: none; }
 .la-axis-fill { height: 100%; border-radius: 3px; }
+.la-rep-meter { display: flex; flex-direction: column; gap: 4px; padding: 4px 2px; }
+.la-rep-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 0.84em; }
+.la-rep-tier { font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.la-rep-score { font-family: var(--lumiverse-font-mono, ui-monospace, monospace); font-size: 0.88em; color: #b8afa3; }
+.la-rep-scale { display: flex; justify-content: space-between; font-size: 0.72em; color: #7a7066; }
+.la-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5em, 1fr)); gap: 6px; }
+.la-stat-cell { display: flex; flex-direction: column; gap: 3px; padding: 4px 6px; border-radius: 5px; background: #1c1713; border: 1px solid #2b241d; }
+.la-stat-head { display: flex; justify-content: space-between; font-size: 0.82em; color: #dcd4c8; }
+.la-stat-track { height: 5px; border-radius: 3px; background: #26201a; overflow: hidden; }
+.la-stat-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #b88b3a, #e2b857); }
 
 /* ── Dams dashboard (Sluices, Flags, Filters, Intent) ── */
 .la-dam-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(11em, 1fr)); gap: 6px; }

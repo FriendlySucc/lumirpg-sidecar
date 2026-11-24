@@ -743,15 +743,39 @@ var PAIR_AXES = [
   { negEmoji: "\uD83C\uDF2B️", negLabel: "Indifference", negColor: "#98a0a8", posEmoji: "\uD83C\uDFE0", posLabel: "Warmth", posColor: "#e8b878" },
   { negEmoji: "\uD83D\uDC0D", negLabel: "Envy", negColor: "#88c888", posEmoji: "\uD83D\uDD4A️", posLabel: "Devotion", posColor: "#c8d8f0" }
 ];
+var PAIR_EMOJI_ALIAS = {
+  "\uD83E\uDD2C": "\uD83D\uDE20",
+  "\uD83D\uDE21": "\uD83D\uDE20",
+  "\uD83D\uDC9B": "\uD83E\uDD1D"
+};
+function normPairEmoji(raw) {
+  const clean = raw.replace(/\uFE0F/g, "");
+  return PAIR_EMOJI_ALIAS[clean] ?? clean;
+}
 function parseMatrixTokens(raw) {
   const map = new Map;
-  const re = /([^\s\[\]]+)\s*\[\s*([+-]?\d+)\s*,\s*([^\]]+?)\s*\]/g;
+  const re = /([^\s\[\]|]+)\s*\[\s*([+-]?\d+)\s*,\s*([^\]]+?)\s*\]/g;
   let m;
   while ((m = re.exec(raw)) !== null) {
-    const key = m[1].replace(/\uFE0F/g, "");
-    map.set(key, { val: parseInt(m[2], 10) || 0, acc: m[3].trim() });
+    map.set(normPairEmoji(m[1]), { val: parseInt(m[2], 10) || 0, acc: m[3].trim() });
   }
   return map;
+}
+function parseFallbackMatrixStats(raw) {
+  const stats = [];
+  for (const part of raw.split(/[|\n,]+/)) {
+    const m = part.trim().match(/^([^\s\d+-]+)\s*[:=]?\s*([+-]?\d+)$/);
+    if (m)
+      stats.push({ icon: m[1], val: parseInt(m[2], 10) || 0 });
+  }
+  return stats;
+}
+function shortBadge(raw, maxLen = 28) {
+  const clean = normText(raw);
+  if (!clean)
+    return "";
+  const head = clean.split(/\s+[—–-]\s+|\s*[:;|]\s*/)[0].trim() || clean;
+  return head.length > maxLen ? `${head.slice(0, maxLen - 1).trimEnd()}…` : head;
 }
 function renderPairs(root, container, expandedCards, onToggle) {
   const entries = childrenByTag(root, "pair");
@@ -771,7 +795,7 @@ function renderPairs(root, container, expandedCards, onToggle) {
       cardId: `pair:${names}`,
       icon: "\uD83D\uDC9A",
       title: names,
-      badge: mode || "PAIR",
+      badge: shortBadge(mode || "PAIR"),
       accentColor: "#4ade80",
       expandedCards,
       onToggle
@@ -786,11 +810,12 @@ function renderPairs(root, container, expandedCards, onToggle) {
           chips.append(el("span", "la-meta-chip", `Gate · ${gateVal}`));
         body.append(chips);
       }
-      if (tokens.size > 0) {
+      const hasVexaAxis = tokens.size > 0 && PAIR_AXES.some((a) => tokens.has(normPairEmoji(a.negEmoji)) || tokens.has(normPairEmoji(a.posEmoji)));
+      if (hasVexaAxis) {
         const stack = el("div", "la-axis-stack");
         for (const axis of PAIR_AXES) {
-          const neg = tokens.get(axis.negEmoji.replace(/\uFE0F/g, "")) ?? { val: 0, acc: "0" };
-          const pos = tokens.get(axis.posEmoji.replace(/\uFE0F/g, "")) ?? { val: 0, acc: "0" };
+          const neg = tokens.get(normPairEmoji(axis.negEmoji)) ?? { val: 0, acc: "0" };
+          const pos = tokens.get(normPairEmoji(axis.posEmoji)) ?? { val: 0, acc: "0" };
           const row = el("div", "la-axis-row");
           const labels = el("div", "la-axis-labels");
           const leftLbl = el("span", "la-axis-side la-axis-neg");
@@ -817,10 +842,125 @@ function renderPairs(root, container, expandedCards, onToggle) {
         }
         body.append(stack);
       } else if (matrixRaw) {
-        body.append(el("div", "la-card-detail-text", matrixRaw));
+        const fallbackStats = parseFallbackMatrixStats(matrixRaw);
+        if (fallbackStats.length > 0) {
+          const maxStat = Math.max(10, ...fallbackStats.map((s) => Math.abs(s.val)));
+          const grid = el("div", "la-stat-grid");
+          for (const stat of fallbackStats) {
+            const cell = el("div", "la-stat-cell");
+            const head = el("div", "la-stat-head");
+            head.append(el("span", undefined, stat.icon), el("strong", undefined, String(stat.val)));
+            const track = el("div", "la-stat-track");
+            const fill = el("div", "la-stat-fill");
+            fill.style.width = `${Math.min(100, Math.max(4, Math.abs(stat.val) / maxStat * 100))}%`;
+            track.append(fill);
+            cell.append(head, track);
+            grid.append(cell);
+          }
+          body.append(grid);
+        } else {
+          body.append(el("div", "la-card-detail-text", matrixRaw));
+        }
       }
       if (wallRaw && !isEmptyVal(wallRaw)) {
         body.append(el("div", "la-card-footer", `Wall: ${wallRaw}`));
+      }
+    });
+    container.append(card);
+  }
+  return true;
+}
+function parseReputationScore(scoreRaw, standingRaw) {
+  const numMatch = (scoreRaw || standingRaw).match(/([+-]?\d{1,4})/);
+  if (numMatch) {
+    const n = Math.max(-1000, Math.min(1000, parseInt(numMatch[1], 10) || 0));
+    return { score: n, estimated: false };
+  }
+  const s = standingRaw.toLowerCase();
+  if (/hated|nemesis|exiled|severed|betrayed|blood/.test(s))
+    return { score: -750, estimated: true };
+  if (/hostile|enemy|despised|wanted/.test(s))
+    return { score: -550, estimated: true };
+  if (/unfriendly|suspicious|wary|cold|strained|distrust/.test(s))
+    return { score: -250, estimated: true };
+  if (/revered|exalted|devoted|legendary|idolized/.test(s))
+    return { score: 800, estimated: true };
+  if (/honored|trusted|allied|loyal|respected/.test(s))
+    return { score: 550, estimated: true };
+  if (/friendly|warm|favored|liked|cordial/.test(s))
+    return { score: 280, estimated: true };
+  return { score: 0, estimated: true };
+}
+function reputationColor(score) {
+  if (score <= -500)
+    return "#e86a6a";
+  if (score < -80)
+    return "#e89b6a";
+  if (score >= 500)
+    return "#4ade80";
+  if (score > 80)
+    return "#7ec8f0";
+  return "#c4b59d";
+}
+function renderReputation(root, container, expandedCards, onToggle) {
+  const entries = childrenByTag(root, "ent_rep");
+  if (!entries.length)
+    return false;
+  for (let i = 0;i < entries.length; i++) {
+    const entry = entries[i];
+    const name = childText(entry, "name") || "Faction";
+    const scoreRaw = childText(entry, "score") || childText(entry, "value") || childText(entry, "rep");
+    const standingRaw = childText(entry, "standing");
+    const noteRaw = childText(entry, "note") || childText(entry, "details") || childText(entry, "reason");
+    const buffRaw = childText(entry, "buff") || childText(entry, "effect") || childText(entry, "modifier");
+    const { score, estimated } = parseReputationScore(scoreRaw, standingRaw);
+    const color = reputationColor(score);
+    const tierLabel = shortBadge(standingRaw || (score > 80 ? "Friendly" : score < -80 ? "Hostile" : "Neutral"), 24);
+    const card = makeCollapsibleCard({
+      cardId: `reputation:${name}:${i}`,
+      icon: "⭐",
+      title: name,
+      badge: tierLabel,
+      accentColor: color,
+      expandedCards,
+      onToggle
+    }, (body) => {
+      const meter = el("div", "la-rep-meter");
+      const head = el("div", "la-rep-head");
+      const tierEl = el("span", "la-rep-tier", tierLabel);
+      tierEl.style.color = color;
+      const scoreText = `${score > 0 ? "+" : ""}${score}${estimated ? " (est.)" : ""}`;
+      head.append(tierEl, el("span", "la-rep-score", scoreText));
+      const track = el("div", "la-axis-track");
+      const negHalf = el("div", "la-axis-half la-axis-half-neg");
+      const negFill = el("div", "la-axis-fill");
+      negFill.style.width = score < 0 ? `${Math.min(100, Math.abs(score) / 1000 * 100)}%` : "0%";
+      negFill.style.background = color;
+      negHalf.append(negFill);
+      const posHalf = el("div", "la-axis-half la-axis-half-pos");
+      const posFill = el("div", "la-axis-fill");
+      posFill.style.width = score > 0 ? `${Math.min(100, score / 1000 * 100)}%` : "0%";
+      posFill.style.background = color;
+      posHalf.append(posFill);
+      track.append(negHalf, el("div", "la-axis-center"), posHalf);
+      const scale = el("div", "la-rep-scale");
+      scale.append(el("span", undefined, "-1000"), el("span", undefined, "0"), el("span", undefined, "+1000"));
+      meter.append(head, track, scale);
+      body.append(meter);
+      if (standingRaw && standingRaw !== tierLabel) {
+        const row = el("div", "la-card-detail");
+        row.append(el("div", "la-card-detail-title", "STANDING"), el("div", "la-card-detail-text", standingRaw));
+        body.append(row);
+      }
+      if (noteRaw) {
+        const row = el("div", "la-card-detail");
+        row.append(el("div", "la-card-detail-title", "NOTES"), el("div", "la-card-detail-text", noteRaw));
+        body.append(row);
+      }
+      if (buffRaw) {
+        const row = el("div", "la-card-detail");
+        row.append(el("div", "la-card-detail-title", "EFFECT"), el("div", "la-card-detail-text", buffRaw));
+        body.append(row);
       }
     });
     container.append(card);
@@ -1141,7 +1281,7 @@ function renderGeneric(root, container, sectionId, sectionColor, collapsible, ex
     const nameEl = subChildren.find((c) => ["name", "names", "pair", "title"].includes(c.tagName.toLowerCase()));
     const badgeEl = subChildren.find((c) => ["standing", "mode", "status", "salience"].includes(c.tagName.toLowerCase()));
     const title = nameEl ? normText(nameEl.textContent) : child.tagName.replace(/_/g, " ");
-    const badge = badgeEl ? normText(badgeEl.textContent) : undefined;
+    const badge = badgeEl ? shortBadge(normText(badgeEl.textContent)) : undefined;
     const buildBody = (body) => {
       if (!subChildren.length) {
         const t = normText(child.textContent);
@@ -1229,6 +1369,9 @@ function renderStateSection(opts) {
       break;
     case "pair":
       handled = renderPairs(root, container, expandedCards, onToggle);
+      break;
+    case "reputation":
+      handled = renderReputation(root, container, expandedCards, onToggle);
       break;
     case "tracks":
       handled = renderTracks(root, container);
@@ -1426,7 +1569,7 @@ var STYLES = `
 }
 .la-card-open { border-color: #c4973c; }
 .la-card-head {
-  display: flex; align-items: center; gap: 0.55em;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4em 0.55em;
   padding: 0.65em 0.8em;
   min-height: 2.75em;
   cursor: pointer;
@@ -1439,11 +1582,12 @@ var STYLES = `
 }
 .la-card-chevron { font-size: 0.95em; color: #c4973c; width: 1.1em; text-align: center; flex: none; }
 .la-card-icon { font-size: 1.1em; min-width: 1.35em; text-align: center; line-height: 1.1; flex: none; }
-.la-card-name { font-weight: 700; font-size: 1em; color: #ece5da; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.la-card-name { font-weight: 700; font-size: 1em; color: #ece5da; flex: 1 1 8em; min-width: 0; overflow-wrap: break-word; word-break: normal; }
 .la-loc-id { font-family: var(--lumiverse-font-mono, ui-monospace, monospace); font-size: 0.78em; color: #8a8078; background: #231e19; padding: 1px 4px; border-radius: 3px; }
 .la-card-badge {
   font-size: 0.78em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 0.16em 0.55em; border-radius: 999px; flex: none;
+  padding: 0.16em 0.55em; border-radius: 999px; flex: 0 1 auto; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   background: #252018; border: 1px solid #4a3d2e; color: #d4b886;
 }
 .la-card-body { padding: 7px 9px; display: flex; flex-direction: column; gap: 6px; }
@@ -1542,6 +1686,16 @@ var STYLES = `
 .la-axis-half-pos { justify-content: flex-start; }
 .la-axis-center { width: 2px; height: 100%; background: #4a4036; flex: none; }
 .la-axis-fill { height: 100%; border-radius: 3px; }
+.la-rep-meter { display: flex; flex-direction: column; gap: 4px; padding: 4px 2px; }
+.la-rep-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 0.84em; }
+.la-rep-tier { font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.la-rep-score { font-family: var(--lumiverse-font-mono, ui-monospace, monospace); font-size: 0.88em; color: #b8afa3; }
+.la-rep-scale { display: flex; justify-content: space-between; font-size: 0.72em; color: #7a7066; }
+.la-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5em, 1fr)); gap: 6px; }
+.la-stat-cell { display: flex; flex-direction: column; gap: 3px; padding: 4px 6px; border-radius: 5px; background: #1c1713; border: 1px solid #2b241d; }
+.la-stat-head { display: flex; justify-content: space-between; font-size: 0.82em; color: #dcd4c8; }
+.la-stat-track { height: 5px; border-radius: 3px; background: #26201a; overflow: hidden; }
+.la-stat-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #b88b3a, #e2b857); }
 
 /* ── Dams dashboard (Sluices, Flags, Filters, Intent) ── */
 .la-dam-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(11em, 1fr)); gap: 6px; }
