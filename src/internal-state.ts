@@ -26,7 +26,7 @@ const XML_NAME = '[A-Za-z_][A-Za-z0-9_.:-]*'
 const VALID_SECTION = new Set<string>(STATE_SECTIONS)
 
 /** A deliberately conservative XML fragment reader. It preserves original bytes. */
-function parseXml(xml: string): XmlNode {
+export function parseXml(xml: string): XmlNode {
   for (const character of xml) {
     const code = character.codePointAt(0)!
     if (!(code === 9 || code === 10 || code === 13 || (code >= 0x20 && code <= 0xd7ff) || (code >= 0xe000 && code <= 0xfffd) || (code >= 0x10000 && code <= 0x10ffff))) throw new Error('Invalid XML character')
@@ -240,7 +240,7 @@ function escapeText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-function decodeText(text: string): string {
+export function decodeText(text: string): string {
   return text.replace(/&(?:amp|lt|gt|quot|apos|#[0-9]+|#x[0-9a-fA-F]+);/g, entity => {
     const standard: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'" }
     if (Object.hasOwn(standard, entity)) return standard[entity]
@@ -658,6 +658,10 @@ export function applyStateDelta(current: InternalState, delta: Record<string, un
   }
   return { sections, ...(current.ledger === undefined ? {} : { ledger: current.ledger }), ...(current.envelope === undefined ? {} : { envelope: current.envelope }) }
 }
+
+// Shared with the JSON Analyze bridge; both operate on validated source spans.
+export type { XmlNode }
+export { RECORDS, SCALAR_FIELDS, SECTION_CONTAINERS, SECTION_SCALAR_CHILDREN, sectionRoot, nodeText, escapeText, plainObject, onlyKeys }
 
 /** Render reference context only; caller decides where it is injected. */
 export function renderStateForPrompt(state: InternalState): string {

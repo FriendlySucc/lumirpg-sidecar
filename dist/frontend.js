@@ -2619,7 +2619,7 @@ ${tile.summary}` : ""}`;
         if (reasoningText)
           thinkingBody.textContent = reasoningText;
         else if (state.stream?.outputTail)
-          thinkingBody.textContent = `Generating map JSON (${outChars} chars)…
+          thinkingBody.textContent = `Atlas JSON (${outChars} chars)…
 ${state.stream.outputTail}`;
         else if (state.busy)
           thinkingBody.textContent = state.config.reasoningMode === "off" ? "Streaming JSON directly…" : "Waiting for reasoning tokens…";

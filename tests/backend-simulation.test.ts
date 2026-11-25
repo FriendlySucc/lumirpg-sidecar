@@ -17,7 +17,7 @@ let release: (() => void) | undefined
 let waitForRelease = false
 let nextMapPatch: Record<string, unknown> = {}
 const configKey = 'lumi-atlas-v1/config.json'
-const chatKey = 'lumi-atlas-v1/chats/test-chat.json'
+const chatKey = 'lumi-atlas-v2/chats/test-chat.json'
 const mock: Obj = {
   host:{capabilities:{}},
   permissions:{has:()=>true,onChanged:()=>()=>{}},
@@ -31,7 +31,8 @@ const mock: Obj = {
   generate:{rawStream:async function* (request:Obj){
     requests.push(request)
     if(waitForRelease) await new Promise<void>(resolve=>{release=resolve})
-    yield {type:'done',content:JSON.stringify({statePatch:{world:{fields:{time:'noon'}}},mapPatch:nextMapPatch}),finish_reason:'stop'}
+    const turnDiff = request.messages[0].content.startsWith('LumiAtlas Analyze:')
+    yield {type:'done',content:JSON.stringify({statePatch:{world:turnDiff ? {time:'noon'} : {fields:{time:'noon'}}},mapPatch:nextMapPatch}),finish_reason:'stop'}
   }},
   on:(name:string, fn:any)=>{ const a=events.get(name)??[]; a.push(fn); events.set(name,a); return ()=>{} },
   onFrontendMessage:(fn:any)=>{frontend=fn},
@@ -61,7 +62,8 @@ test('enabling the extension runs one sidecar call on a successful new assistant
   expect(requests[0].userId).toBe(user)
   expect(requests[0].connection_id).toBe('sidecar')
   expect(requests[0].messages.map((m:any)=>m.content).join('\n')).toContain('statePatch')
-  const saved=writes.get(chatKey)
+  const saved=outbound.find(x=>x.type==='status'&&x.status==='ready'&&x.internalState)
+  expect(writes.get(chatKey).schema).toBe(2)
   expect(saved.internalState.sections.world).toContain('<time>noon</time>')
   expect(saved.internalState.sections.inv).toContain('<inv>tools</inv>')
   const interception = await interceptor!([{role:'user',content:'Please continue.'}],{userId:user,chatId:chat})

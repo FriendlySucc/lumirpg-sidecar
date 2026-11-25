@@ -1301,7 +1301,7 @@ export function setup(ctx: SpindleFrontendContext) {
       thinkingBody.hidden = !state.thinkingOpen
       if (state.thinkingOpen) {
         if (reasoningText) thinkingBody.textContent = reasoningText
-        else if (state.stream?.outputTail) thinkingBody.textContent = `Generating map JSON (${outChars} chars)…\n${state.stream.outputTail}`
+        else if (state.stream?.outputTail) thinkingBody.textContent = `Atlas JSON (${outChars} chars)…\n${state.stream.outputTail}`
         else if (state.busy) thinkingBody.textContent = state.config.reasoningMode === 'off' ? 'Streaming JSON directly…' : 'Waiting for reasoning tokens…'
         else thinkingBody.textContent = ''
         thinkingBody.scrollTop = thinkingBody.scrollHeight

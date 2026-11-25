@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test'
-import { buildUnifiedPrompt, extractUnifiedDelta } from '../src/unified-prompt.js'
+import { buildRebuildPrompt, extractUnifiedDelta } from '../src/unified-prompt.js'
 import { emptyAtlasState } from '../src/geometry.js'
 
-test('one analyzer prompt describes state and maps as a combined incremental update', () => {
+test('the heavy seed prompt includes the initializer, saved legacy seed and all map scales', () => {
   const state = { sections: { world: '<state:world><time>noon</time></state:world>' } }
-  const prompt = buildUnifiedPrompt([{role:'user',content:'Hello'},{role:'assistant',content:'Hi'}], emptyAtlasState('c1'), state)
+  const prompt = buildRebuildPrompt([{role:'user',content:'Hello'},{role:'assistant',content:'Hi'}], emptyAtlasState('c1'), state)
   expect(prompt).toContain('<state:world><time>noon</time></state:world>')
   expect(prompt).toContain('Hello')
   expect(prompt).toContain('statePatch')
@@ -15,9 +15,9 @@ test('one analyzer prompt describes state and maps as a combined incremental upd
   expect(prompt).toContain('INITIALIZATION REQUIRED for empty map layer(s): local, region, world')
 })
 
-test('buildUnifiedPrompt includes player persona name and message speaker labels', () => {
+test('buildRebuildPrompt includes player persona name and message speaker labels', () => {
   const state = { sections: { world: '<state:world><time>noon</time></state:world>' } }
-  const prompt = buildUnifiedPrompt(
+  const prompt = buildRebuildPrompt(
     [{ role: 'user', name: 'Kris Lyons', content: 'I check the fountain.' }],
     emptyAtlasState('c1'),
     state,

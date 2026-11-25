@@ -1,5 +1,7 @@
 import { beforeAll, expect, test } from 'bun:test'
 
+import { decodeStoredState } from '../src/state-storage.js'
+
 type Obj = Record<string, any>
 const events = new Map<string, Array<(payload: any, userId?: string) => any>>()
 const writes = new Map<string, any>()
@@ -48,8 +50,10 @@ test('a fresh chat without any legacy state bootstraps from a blank but shaped r
   const prompt = requests[0].messages.map((m:any)=>m.content).join('\n')
   expect(prompt).toContain('state:world')
   expect(prompt).toContain('state:offscreen_agendas')
-  await waitUntil(()=>Boolean(writes.get('lumi-atlas-v1/chats/fresh-chat.json')?.internalState))
-  const saved = writes.get('lumi-atlas-v1/chats/fresh-chat.json')
-  expect(saved.internalState.sections.world).toContain('<loc>City Gates</loc>')
-  expect(Object.keys(saved.internalState.sections)).toHaveLength(18)
+  const key = 'lumi-atlas-v2/chats/fresh-chat.json'
+  await waitUntil(()=>Boolean(writes.get(key)?.internalState))
+  expect(writes.get(key).schema).toBe(2)
+  const saved = decodeStoredState(writes.get(key).internalState)
+  expect(saved.sections.world).toContain('<loc>City Gates</loc>')
+  expect(Object.keys(saved.sections)).toHaveLength(18)
 })

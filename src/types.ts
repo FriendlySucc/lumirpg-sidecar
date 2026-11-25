@@ -113,8 +113,8 @@ export interface EffectiveConfig {
   reasoningMode: 'inherit' | 'off'
 }
 
-export interface StoredChatRecord {
-  schema: 1
+/** Runtime/UI view. On disk schema 2 encodes internalState with state-storage.ts. */
+export interface ChatRecord {
   config: ChatConfig
   state: AtlasState
   archives: Record<Scale, MapLayer[]>
